@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
   Select,
   SelectContent,
@@ -92,31 +93,34 @@ export function ColorTrigger() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-3 rounded-card border border-border bg-surface p-3">
           <Label>Target color</Label>
-          <div className="flex items-center gap-3">
-            <div
-              className="h-10 w-10 rounded-control border border-border"
+          <div className="flex items-center gap-2">
+            <label
+              className="relative h-10 w-10 shrink-0 cursor-pointer rounded-control border border-border"
               style={{ background: rgbToHex(color) }}
-              aria-label={`Target color ${rgbToHex(color)}`}
-            />
-            <span className="tabular text-sm">{rgbToHex(color)}</span>
-            <input
-              type="color"
-              aria-label="Pick color"
-              value={rgbToHex(color)}
-              onChange={(e) => {
-                const v = e.target.value;
-                setColor({
-                  r: parseInt(v.slice(1, 3), 16),
-                  g: parseInt(v.slice(3, 5), 16),
-                  b: parseInt(v.slice(5, 7), 16),
-                });
-              }}
-              className="h-9 w-12 cursor-pointer rounded-control border border-border bg-bg"
-            />
+              title="Choose a color"
+            >
+              <input
+                type="color"
+                aria-label="Choose target color"
+                value={rgbToHex(color)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setColor({
+                    r: parseInt(v.slice(1, 3), 16),
+                    g: parseInt(v.slice(3, 5), 16),
+                    b: parseInt(v.slice(5, 7), 16),
+                  });
+                }}
+                className="absolute inset-0 cursor-pointer opacity-0"
+              />
+            </label>
+            <span className="tabular flex-1 text-sm">{rgbToHex(color)}</span>
+            <Tooltip label="Pick color under the cursor">
+              <Button size="icon" variant="outline" aria-label="Pick color under the cursor" onClick={pick}>
+                <Pipette className="h-4 w-4" />
+              </Button>
+            </Tooltip>
           </div>
-          <Button size="sm" variant="outline" onClick={pick}>
-            <Pipette className="h-4 w-4" /> Eyedropper
-          </Button>
         </div>
 
         <div className="space-y-3 rounded-card border border-border bg-surface p-3">

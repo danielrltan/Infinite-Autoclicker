@@ -47,13 +47,13 @@ export default function App() {
           onValueChange={(v) => setTab(v as Tab)}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="border-b border-border bg-bg px-3 pt-2">
-            <TabsList className="bg-transparent p-0">
+          <div className="border-b border-border bg-bg px-3">
+            <TabsList className="h-auto gap-1 rounded-none bg-transparent p-0">
               {TABS.map((t) => (
                 <TabsTrigger
                   key={t.value}
                   value={t.value}
-                  className="data-[state=active]:bg-surface"
+                  className="rounded-none border-b-2 border-transparent px-3 py-2.5 text-muted shadow-none data-[state=active]:border-accent data-[state=active]:bg-transparent data-[state=active]:text-text data-[state=active]:shadow-none"
                 >
                   {t.icon}
                   {t.label}
