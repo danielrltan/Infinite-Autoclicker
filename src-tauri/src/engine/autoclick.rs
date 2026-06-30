@@ -193,7 +193,9 @@ impl AutoClicker {
     }
 }
 
+#[cfg(test)]
 struct NoopSink;
+#[cfg(test)]
 impl AutoClickSink for NoopSink {}
 
 #[cfg(test)]
