@@ -26,7 +26,16 @@ export default {
         play: "var(--play)", // green — playing + success
         warn: "var(--warn)", // amber — permissions, mismatch
       },
+      fontSize: {
+        overline: ["11px", { lineHeight: "16px", letterSpacing: "0.04em" }],
+        label: ["12px", { lineHeight: "16px" }],
+        body: ["13px", { lineHeight: "18px" }],
+        ui: ["14px", { lineHeight: "20px" }],
+        title: ["15px", { lineHeight: "22px", letterSpacing: "-0.006em" }],
+        heading: ["18px", { lineHeight: "24px", letterSpacing: "-0.01em" }],
+      },
       borderRadius: {
+        sm: "4px", // nested elements (select items, chips, dialog close)
         control: "6px",
         card: "8px",
         modal: "12px",

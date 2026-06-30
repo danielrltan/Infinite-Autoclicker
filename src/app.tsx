@@ -1,17 +1,12 @@
-import {
-  MousePointerClick,
-  ListOrdered,
-  Circle,
-  Sparkles,
-  Clock,
-  Square,
-  Dot,
-} from "lucide-react";
+import { Square, Circle } from "lucide-react";
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { SegmentedControl } from "@/components/ui/segmented";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { fmtClock } from "@/lib/utils";
+import { TABS } from "@/lib/tabs";
 import { TopBar } from "@/components/TopBar";
 import { StatusBar } from "@/components/StatusBar";
 import { Toasts } from "@/components/Toasts";
@@ -24,14 +19,6 @@ import { RunControls } from "@/components/RunControls";
 import { ColorTrigger } from "@/components/ColorTrigger/ColorTrigger";
 import { Scheduler } from "@/components/Scheduler/Scheduler";
 import type { Tab } from "@/store";
-
-const TABS: { value: Tab; label: string; icon: React.ReactNode }[] = [
-  { value: "autoclick", label: "Auto Clicker", icon: <MousePointerClick className="h-4 w-4" /> },
-  { value: "steps", label: "Steps", icon: <ListOrdered className="h-4 w-4" /> },
-  { value: "recorded", label: "Recorder", icon: <Circle className="h-4 w-4" /> },
-  { value: "color", label: "Color Trigger", icon: <Sparkles className="h-4 w-4" /> },
-  { value: "schedule", label: "Scheduler", icon: <Clock className="h-4 w-4" /> },
-];
 
 export default function App() {
   const { tab, setTab } = useApp();
@@ -47,23 +34,25 @@ export default function App() {
           onValueChange={(v) => setTab(v as Tab)}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="border-b border-border bg-bg px-3">
-            <TabsList className="h-auto gap-1 rounded-none bg-transparent p-0">
-              {TABS.map((t) => (
-                <TabsTrigger
-                  key={t.value}
-                  value={t.value}
-                  className="rounded-none border-b-2 border-transparent px-3 py-2.5 text-muted shadow-none data-[state=active]:border-accent data-[state=active]:bg-transparent data-[state=active]:text-text data-[state=active]:shadow-none"
-                >
-                  {t.icon}
-                  {t.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <div className="border-b border-border bg-bg">
+            <div className="shell-col">
+              <TabsList className="-ml-2.5 h-auto gap-1 rounded-none bg-transparent p-0">
+                {TABS.map((t) => (
+                  <TabsTrigger
+                    key={t.value}
+                    value={t.value}
+                    className="gap-1.5 rounded-none border-b-2 border-transparent px-2.5 py-2.5 text-ui text-muted shadow-none data-[state=active]:border-accent data-[state=active]:bg-transparent data-[state=active]:text-text data-[state=active]:shadow-none"
+                  >
+                    {t.icon}
+                    {t.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
           </div>
 
-          <main className="min-h-0 flex-1 overflow-auto p-4">
-            <div className="mx-auto max-w-4xl">
+          <main className="min-h-0 flex-1 overflow-auto py-4">
+            <div className="shell-col">
               <TabsContent value="autoclick" className="mt-0">
                 <AutoClicker />
               </TabsContent>
@@ -110,52 +99,35 @@ function RecorderControls() {
     toggleRecord,
   } = useApp();
   return (
-    <div className="flex flex-wrap items-center gap-4 rounded-card border border-border bg-surface p-3 text-sm">
+    <Card className="flex flex-wrap items-center gap-4 p-3">
       {recording.active ? (
-        <Button variant="record" onClick={toggleRecord}>
+        <Button variant="record" size="sm" onClick={toggleRecord}>
           <Square className="h-4 w-4 fill-current" /> Stop (F9)
         </Button>
       ) : (
-        <Button variant="secondary" onClick={toggleRecord}>
+        <Button variant="secondary" size="sm" onClick={toggleRecord}>
           <Circle className="h-4 w-4 fill-record text-record" /> Record (F9)
         </Button>
       )}
-      {recording.active && (
-        <span className="tabular flex items-center gap-1.5 text-record">
-          <Dot className="h-5 w-5 animate-pulse-rec fill-current" />
-          {fmtClock(recording.elapsedMs)} · {recording.count} events
-        </span>
-      )}
-      <span className="text-xs font-medium text-muted">Capture</span>
-      <label className="flex items-center gap-2">
-        <input
-          type="radio"
-          name="capmode"
-          checked={recordMode === "clicks_only"}
-          onChange={() => setRecordMode("clicks_only")}
+      <div className="ml-auto flex items-center gap-4">
+        <SegmentedControl
+          value={recordMode}
+          onChange={setRecordMode}
           disabled={recording.active}
+          options={[
+            { value: "clicks_only", label: "Clicks only" },
+            { value: "full_motion", label: "Full motion" },
+          ]}
         />
-        Clicks only
-      </label>
-      <label className="flex items-center gap-2">
-        <input
-          type="radio"
-          name="capmode"
-          checked={recordMode === "full_motion"}
-          onChange={() => setRecordMode("full_motion")}
-          disabled={recording.active}
-        />
-        Full motion
-      </label>
-      <label className="ml-2 flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={captureKeyboard}
-          onChange={(e) => setCaptureKeyboard(e.target.checked)}
-          disabled={recording.active}
-        />
-        Capture keyboard
-      </label>
-    </div>
+        <label className="flex items-center gap-2 text-label font-medium text-muted">
+          Capture keyboard
+          <Switch
+            checked={captureKeyboard}
+            onCheckedChange={setCaptureKeyboard}
+            disabled={recording.active}
+          />
+        </label>
+      </div>
+    </Card>
   );
 }

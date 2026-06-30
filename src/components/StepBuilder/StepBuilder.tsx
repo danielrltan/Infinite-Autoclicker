@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Crosshair,
   Copy,
@@ -12,8 +11,11 @@ import {
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Field } from "@/components/ui/field";
+import { IconButton } from "@/components/ui/icon-button";
+import { CaptureButton } from "@/components/ui/capture-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Select,
   SelectContent,
@@ -21,7 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { browserCodeToIac } from "@/lib/keymap";
 import { ACTION_LABELS, type Step, type StepAction } from "@/lib/compile";
 import { cn } from "@/lib/utils";
 
@@ -39,18 +40,24 @@ export function StepBuilder() {
   const selected = steps.find((s) => s.id === selectedStepId) ?? null;
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
+    <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[1fr_360px]">
       <div className="space-y-2">
-        <Button size="sm" onClick={() => addStep("click")}>
-          <Plus className="h-4 w-4" /> Add step
-        </Button>
+        <div className="flex items-center justify-between">
+          <span className="text-overline font-semibold uppercase text-muted">
+            Steps · <span className="tabular">{steps.length}</span>
+          </span>
+          <Button size="sm" variant="secondary" onClick={() => addStep("click")}>
+            <Plus className="h-4 w-4" /> Add step
+          </Button>
+        </div>
 
         {steps.length === 0 ? (
-          <p className="rounded-card border border-dashed border-border p-6 text-center text-sm text-muted">
-            No steps yet. Add a step, then choose its action and coordinate.
-          </p>
+          <EmptyState
+            title="No steps yet"
+            description="Add a step, then choose its action and coordinate."
+          />
         ) : (
-          <ul className="space-y-1">
+          <ul className="max-h-[52vh] space-y-1 overflow-auto pr-1">
             {steps.map((s, i) => (
               <li key={s.id}>
                 <div
@@ -59,27 +66,29 @@ export function StepBuilder() {
                   onClick={() => setSelectedStepId(s.id)}
                   onKeyDown={(e) => e.key === "Enter" && setSelectedStepId(s.id)}
                   className={cn(
-                    "flex items-center gap-2 rounded-control border px-3 py-2 text-sm transition-colors",
+                    "group flex items-center gap-2 rounded-control border px-3 py-2 text-ui transition-colors",
                     s.id === selectedStepId
-                      ? "border-accent bg-surface"
-                      : "border-border hover:bg-surface",
+                      ? "rail-accent border-accent bg-surface"
+                      : "border-transparent hover:border-border hover:bg-surface",
                   )}
                 >
-                  <span className="tabular w-6 text-muted">{i + 1}</span>
+                  <span className="tabular w-5 text-right text-label text-muted/70">
+                    {i + 1}
+                  </span>
                   <span className="flex-1 truncate">{stepSummary(s)}</span>
-                  <div className="flex items-center gap-0.5">
-                    <IconBtn label="Move up" onClick={() => moveStep(s.id, -1)}>
+                  <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                    <IconButton label="Move up" onClick={() => moveStep(s.id, -1)}>
                       <ChevronUp className="h-4 w-4" />
-                    </IconBtn>
-                    <IconBtn label="Move down" onClick={() => moveStep(s.id, 1)}>
+                    </IconButton>
+                    <IconButton label="Move down" onClick={() => moveStep(s.id, 1)}>
                       <ChevronDown className="h-4 w-4" />
-                    </IconBtn>
-                    <IconBtn label="Duplicate" onClick={() => duplicateStep(s.id)}>
+                    </IconButton>
+                    <IconButton label="Duplicate" onClick={() => duplicateStep(s.id)}>
                       <Copy className="h-4 w-4" />
-                    </IconBtn>
-                    <IconBtn label="Delete" onClick={() => deleteStep(s.id)}>
-                      <Trash2 className="h-4 w-4 text-record" />
-                    </IconBtn>
+                    </IconButton>
+                    <IconButton label="Delete" variant="danger" onClick={() => deleteStep(s.id)}>
+                      <Trash2 className="h-4 w-4" />
+                    </IconButton>
                   </div>
                 </div>
               </li>
@@ -88,11 +97,11 @@ export function StepBuilder() {
         )}
       </div>
 
-      <div className="rounded-card border border-border bg-surface p-3">
+      <div className="self-start rounded-card border border-border bg-surface p-4 lg:sticky lg:top-3">
         {selected ? (
           <StepEditor step={selected} />
         ) : (
-          <p className="text-sm text-muted">Select a step to edit it.</p>
+          <p className="text-body text-muted">Select a step to edit it.</p>
         )}
       </div>
     </div>
@@ -104,16 +113,15 @@ function StepEditor({ step }: { step: Step }) {
   const set = (p: Partial<Step>) => updateStep(step.id, p);
 
   return (
-    <div className="space-y-3">
-      <div className="space-y-1">
-        <Label>Action</Label>
-        <Select
-          value={step.action}
-          onValueChange={(v) => set({ action: v as StepAction })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between border-b border-border/60 pb-2">
+        <h3 className="text-overline font-semibold uppercase text-muted">Edit step</h3>
+        <span className="tabular text-body text-muted">{ACTION_LABELS[step.action]}</span>
+      </div>
+
+      <Field label="Action">
+        <Select value={step.action} onValueChange={(v) => set({ action: v as StepAction })}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             {(Object.keys(ACTION_LABELS) as StepAction[]).map((a) => (
               <SelectItem key={a} value={a}>
@@ -122,7 +130,7 @@ function StepEditor({ step }: { step: Step }) {
             ))}
           </SelectContent>
         </Select>
-      </div>
+      </Field>
 
       {step.action === "click" && (
         <>
@@ -135,8 +143,7 @@ function StepEditor({ step }: { step: Step }) {
             onY={(y) => set({ y })}
             onCapture={() => captureCursorInto("click")}
           />
-          <div className="space-y-1">
-            <Label>Click type</Label>
+          <Field label="Click type">
             <Select value={step.clickType} onValueChange={(v) => set({ clickType: v as Step["clickType"] })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -146,12 +153,12 @@ function StepEditor({ step }: { step: Step }) {
                 <SelectItem value="double">Double click</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Field>
           {step.clickType !== "double" && (
             <NumField label="Click count" value={step.count} min={1} onChange={(count) => set({ count })} />
           )}
           <label className="flex items-center justify-between">
-            <Label>Return cursor after click</Label>
+            <span className="text-label font-medium text-muted">Return cursor after click</span>
             <Switch checked={step.returnCursor} onCheckedChange={(returnCursor) => set({ returnCursor })} />
           </label>
         </>
@@ -159,28 +166,9 @@ function StepEditor({ step }: { step: Step }) {
 
       {step.action === "drag" && (
         <>
-          <Coord
-            xLabel="From X"
-            yLabel="From Y"
-            x={step.fromX}
-            y={step.fromY}
-            onX={(fromX) => set({ fromX })}
-            onY={(fromY) => set({ fromY })}
-            onCapture={() => captureCursorInto("dragFrom")}
-            captureLabel="Capture start"
-          />
-          <Coord
-            xLabel="To X"
-            yLabel="To Y"
-            x={step.toX}
-            y={step.toY}
-            onX={(toX) => set({ toX })}
-            onY={(toY) => set({ toY })}
-            onCapture={() => captureCursorInto("dragTo")}
-            captureLabel="Capture end"
-          />
-          <div className="space-y-1">
-            <Label>Button</Label>
+          <Coord xLabel="From X" yLabel="From Y" x={step.fromX} y={step.fromY} onX={(fromX) => set({ fromX })} onY={(fromY) => set({ fromY })} onCapture={() => captureCursorInto("dragFrom")} captureLabel="Capture start" />
+          <Coord xLabel="To X" yLabel="To Y" x={step.toX} y={step.toY} onX={(toX) => set({ toX })} onY={(toY) => set({ toY })} onCapture={() => captureCursorInto("dragTo")} captureLabel="Capture end" />
+          <Field label="Button">
             <Select value={step.button} onValueChange={(v) => set({ button: v as Step["button"] })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -189,25 +177,16 @@ function StepEditor({ step }: { step: Step }) {
                 <SelectItem value="middle">Middle</SelectItem>
               </SelectContent>
             </Select>
-          </div>
+          </Field>
           <NumField label="Move duration (ms)" value={step.durationMs} min={0} step={50} onChange={(durationMs) => set({ durationMs })} />
         </>
       )}
 
       {step.action === "scroll" && (
         <>
-          <Coord
-            xLabel="X"
-            yLabel="Y"
-            x={step.x}
-            y={step.y}
-            onX={(x) => set({ x })}
-            onY={(y) => set({ y })}
-            onCapture={() => captureCursorInto("click")}
-          />
+          <Coord xLabel="X" yLabel="Y" x={step.x} y={step.y} onX={(x) => set({ x })} onY={(y) => set({ y })} onCapture={() => captureCursorInto("click")} />
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label>Direction</Label>
+            <Field label="Direction">
               <Select value={step.scrollDir} onValueChange={(v) => set({ scrollDir: v as Step["scrollDir"] })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -217,13 +196,17 @@ function StepEditor({ step }: { step: Step }) {
                   <SelectItem value="right">Right</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
             <NumField label="Amount (notches)" value={step.scrollAmount} min={1} onChange={(scrollAmount) => set({ scrollAmount })} />
           </div>
         </>
       )}
 
-      {step.action === "key" && <KeyField step={step} set={set} />}
+      {step.action === "key" && (
+        <Field label="Key" hint="Taps the key (press + release).">
+          <CaptureButton value={step.keyCode} onCapture={(keyCode) => set({ keyCode })} className="w-full" />
+        </Field>
+      )}
 
       {step.action === "wait" && (
         <NumField label="Wait (ms)" value={step.waitMs} min={0} step={50} onChange={(waitMs) => set({ waitMs })} />
@@ -231,8 +214,7 @@ function StepEditor({ step }: { step: Step }) {
 
       {step.action === "record" && <RecordField step={step} />}
 
-      {/* Common delay fields (all actions) */}
-      <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
+      <div className="grid grid-cols-2 gap-2 border-t border-border/60 pt-3">
         <NumField label="Delay before (s)" value={step.delayBefore} step={0.1} min={0} onChange={(delayBefore) => set({ delayBefore })} />
         <NumField label="Delay jitter (s)" value={step.delayJitter} step={0.1} min={0} onChange={(delayJitter) => set({ delayJitter })} />
       </div>
@@ -240,38 +222,11 @@ function StepEditor({ step }: { step: Step }) {
   );
 }
 
-function KeyField({ step, set }: { step: Step; set: (p: Partial<Step>) => void }) {
-  const [listening, setListening] = useState(false);
-  return (
-    <div className="space-y-1">
-      <Label>Key</Label>
-      <button
-        onClick={() => setListening(true)}
-        onBlur={() => setListening(false)}
-        onKeyDown={(e) => {
-          if (!listening) return;
-          e.preventDefault();
-          const code = browserCodeToIac(e.nativeEvent);
-          if (code) {
-            set({ keyCode: code });
-            setListening(false);
-          }
-        }}
-        className={`tabular h-9 w-full rounded-control border px-3 text-sm ${listening ? "border-accent text-accent" : "border-border"}`}
-      >
-        {listening ? "Press a key…" : step.keyCode}
-      </button>
-      <p className="text-xs text-muted">Taps the key (press + release).</p>
-    </div>
-  );
-}
-
 function RecordField({ step }: { step: Step }) {
   const { recordIntoStep, recording } = useApp();
-  const isRecordingThis = recording.active;
   return (
     <div className="space-y-2">
-      {isRecordingThis ? (
+      {recording.active ? (
         <Button size="sm" variant="record" onClick={() => recordIntoStep(step.id)}>
           <Square className="h-4 w-4 fill-current" /> Stop recording ({recording.count})
         </Button>
@@ -281,7 +236,7 @@ function RecordField({ step }: { step: Step }) {
           {step.events.length > 0 ? "Re-record" : "Record actions"}
         </Button>
       )}
-      <p className="text-xs text-muted">
+      <p className="text-body text-muted">
         {step.events.length > 0
           ? `${step.events.length} events recorded — replayed inline at this point.`
           : "Records your live input and replays it as part of this macro."}
@@ -336,8 +291,7 @@ function NumField({
   step?: number;
 }) {
   return (
-    <div className="space-y-1">
-      <Label>{label}</Label>
+    <Field label={label}>
       <Input
         type="number"
         className="tabular"
@@ -346,31 +300,7 @@ function NumField({
         step={step}
         onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
       />
-    </div>
-  );
-}
-
-function IconBtn({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      aria-label={label}
-      title={label}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      className="rounded-[4px] p-1 text-muted transition-colors hover:bg-border/50 hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
-    >
-      {children}
-    </button>
+    </Field>
   );
 }
 

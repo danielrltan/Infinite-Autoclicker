@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  /* One column knob shared by header / tabs / main / footer. */
+  .shell-col {
+    @apply mx-auto w-full max-w-4xl px-4;
+  }
+  /* Left rails: "you're editing this" vs "this is running". */
+  .rail-accent {
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+  .rail-play {
+    box-shadow: inset 2px 0 0 var(--play);
+  }
+}
+
 /* Design tokens — SPEC §10. Light is default; `.dark` on <html> flips them.
    Fonts use system stacks (no network fetch, per the privacy guarantee). */
 :root {
@@ -60,11 +74,10 @@
     font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
     font-variant-numeric: tabular-nums;
   }
-  /* Visible keyboard focus on every control (a11y floor, SPEC §10). */
+  /* Single focus language; the ring follows each control's own radius. */
   :focus-visible {
     outline: 2px solid var(--accent);
-    outline-offset: 2px;
-    border-radius: 4px;
+    outline-offset: 1px;
   }
   /* Respect reduced motion: kill the playhead + transitions. */
   @media (prefers-reduced-motion: reduce) {

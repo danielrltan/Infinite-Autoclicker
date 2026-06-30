@@ -1,7 +1,9 @@
 import * as React from "react";
-import { Trash2, FileText, RotateCcw, X, FolderOpen, Library as LibraryIcon } from "lucide-react";
+import { Trash2, FileText, RotateCcw, X, Library as LibraryIcon } from "lucide-react";
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Dialog,
   DialogContent,
@@ -51,18 +53,19 @@ export function LibraryPanel({ onOpened }: { onOpened?: () => void }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Saved macros</h2>
+        <h2 className="text-title font-semibold">Saved macros</h2>
         <Button size="sm" variant="ghost" onClick={() => setTrashOpen(true)}>
           <Trash2 className="h-4 w-4" /> Trash
         </Button>
       </div>
 
       {library.length === 0 ? (
-        <p className="rounded-card border border-dashed border-border p-8 text-center text-sm text-muted">
-          No saved macros yet. Build or record one, then Save.
-        </p>
+        <EmptyState
+          title="No saved macros yet"
+          description="Build or record one, then Save."
+        />
       ) : (
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {library.map((m) => (
             <MacroCard
               key={m.path}
@@ -92,26 +95,32 @@ function MacroCard({
   onDelete: () => void;
 }) {
   return (
-    <li className="group flex items-start gap-2 rounded-card border border-border bg-surface p-3">
-      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{m.name}</div>
-        <div className="tabular text-[11px] text-muted">
-          {m.source} · {m.event_count} events
-        </div>
-        <div className="mt-2 flex gap-1">
-          <Button size="sm" variant="secondary" onClick={onOpen}>
-            <FolderOpen className="h-3.5 w-3.5" /> Open
-          </Button>
-          <button
-            aria-label={`Delete ${m.name}`}
-            title="Delete"
-            onClick={onDelete}
-            className="rounded-control p-1.5 text-muted transition-colors hover:bg-border/50 hover:text-record focus-visible:outline-2 focus-visible:outline-accent"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
+    <li
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className="group relative cursor-pointer self-start rounded-card border border-border bg-surface p-4 transition-colors hover:border-accent/50"
+    >
+      <div className="flex items-start justify-between">
+        <FileText className="h-4 w-4 text-muted/60" />
+        <IconButton
+          label={`Delete ${m.name}`}
+          variant="danger"
+          className="opacity-0 transition-opacity group-hover:opacity-100"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-4 w-4" />
+        </IconButton>
+      </div>
+      <div className="mt-2 truncate text-ui font-medium">{m.name}</div>
+      <div className="tabular mt-0.5 text-body text-muted">
+        {m.source} · {m.event_count} events
       </div>
     </li>
   );
@@ -207,15 +216,13 @@ function TrashDialog({
                   <Button size="sm" variant="secondary" onClick={() => restore(t)}>
                     <RotateCcw className="h-3.5 w-3.5" /> Restore
                   </Button>
-                  <button
-                    type="button"
-                    aria-label={`Delete ${t.original_name} forever`}
-                    title="Delete forever"
+                  <IconButton
+                    label={`Delete ${t.original_name} forever`}
+                    variant="danger"
                     onClick={() => purge(t)}
-                    className="rounded-[4px] p-1 text-muted transition-colors hover:text-record focus-visible:outline-2 focus-visible:outline-accent"
                   >
                     <X className="h-4 w-4" />
-                  </button>
+                  </IconButton>
                 </li>
               ))}
             </ul>

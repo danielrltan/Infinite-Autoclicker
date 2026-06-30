@@ -1,6 +1,8 @@
 import { Trash2, Eraser } from "lucide-react";
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { fmtMs } from "@/lib/utils";
 import type { MacroEvent } from "@/lib/types";
 
@@ -10,9 +12,10 @@ export function EventList() {
 
   if (recordedEvents.length === 0) {
     return (
-      <p className="rounded-card border border-dashed border-border p-6 text-center text-sm text-muted">
-        No recorded events. Press Record (F9) and perform some actions.
-      </p>
+      <EmptyState
+        title="No recorded events"
+        description="Press Record (F9) and perform some actions."
+      />
     );
   }
 
@@ -22,7 +25,7 @@ export function EventList() {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted">
+        <span className="text-overline font-semibold uppercase text-muted">
           <span className="tabular">{recordedEvents.length}</span> recorded events
         </span>
         <Button size="sm" variant="ghost" onClick={clearRecording}>
@@ -45,7 +48,7 @@ export function EventList() {
               key={i}
               className={
                 i === activeIndex
-                  ? "bg-play/10"
+                  ? "bg-play/10 rail-play"
                   : "odd:bg-surface/40 hover:bg-surface"
               }
             >
@@ -53,14 +56,13 @@ export function EventList() {
               <td className="tabular px-3 py-1.5 text-muted">{fmtMs(e.t)}</td>
               <td className="tabular px-3 py-1.5">{eventLabel(e)}</td>
               <td className="px-3 py-1.5 text-right">
-                <button
-                  aria-label={`Delete event ${i + 1}`}
-                  title="Delete"
+                <IconButton
+                  label={`Delete event ${i + 1}`}
+                  variant="danger"
                   onClick={() => deleteRecordedEvent(i)}
-                  className="rounded-[4px] p-1 text-muted hover:bg-border/50 hover:text-record focus-visible:outline-2 focus-visible:outline-accent"
                 >
                   <Trash2 className="h-4 w-4" />
-                </button>
+                </IconButton>
               </td>
             </tr>
           ))}

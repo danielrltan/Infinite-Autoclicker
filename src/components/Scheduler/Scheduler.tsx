@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { X, Clock } from "lucide-react";
+import { X, Clock, AlertTriangle } from "lucide-react";
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Section } from "@/components/ui/card";
+import { Field } from "@/components/ui/field";
+import { EmptyState } from "@/components/ui/empty-state";
+import { IconButton } from "@/components/ui/icon-button";
 import {
   Select,
   SelectContent,
@@ -42,67 +45,63 @@ export function Scheduler() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-card border border-warn/40 bg-warn/10 px-3 py-2 text-xs text-warn">
+    <div className="mx-auto max-w-2xl space-y-4">
+      <div className="flex items-center gap-2 rounded-card border border-warn/40 bg-warn/10 px-3 py-2 text-body text-warn">
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
         Scheduled runs require the app to stay open.
       </div>
 
-      <div className="space-y-3 rounded-card border border-border bg-surface p-3">
-        <div className="space-y-1">
-          <Label>Trigger</Label>
+      <Section title="New schedule">
+        <Field label="Trigger">
           <Select value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="once">One-shot (date & time)</SelectItem>
+              <SelectItem value="once">One-shot (date &amp; time)</SelectItem>
               <SelectItem value="interval">Interval</SelectItem>
               {settings.weekly_recurrence_enabled && (
                 <SelectItem value="weekly">Weekly</SelectItem>
               )}
             </SelectContent>
           </Select>
-        </div>
+        </Field>
 
         {mode === "once" && (
-          <div className="space-y-1">
-            <Label>Run at</Label>
+          <Field label="Run at">
             <Input
               type="datetime-local"
-              className="tabular w-64"
+              className="tabular"
               value={onceAt}
               onChange={(e) => setOnceAt(e.target.value)}
             />
-          </div>
+          </Field>
         )}
 
         {mode === "interval" && (
-          <div className="flex items-end gap-2">
-            <div className="space-y-1">
-              <Label>Every</Label>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Every">
               <Input
                 type="number"
                 min={1}
-                className="tabular w-24"
+                className="tabular"
                 value={everyN}
                 onChange={(e) => setEveryN(Math.max(1, parseInt(e.target.value) || 1))}
               />
-            </div>
-            <Select value={everyUnit} onValueChange={(v) => setEveryUnit(v as "min" | "hour")}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="min">minutes</SelectItem>
-                <SelectItem value="hour">hours</SelectItem>
-              </SelectContent>
-            </Select>
+            </Field>
+            <Field label="Unit">
+              <Select value={everyUnit} onValueChange={(v) => setEveryUnit(v as "min" | "hour")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="min">minutes</SelectItem>
+                  <SelectItem value="hour">hours</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
         )}
 
         {mode === "weekly" && settings.weekly_recurrence_enabled && (
-          <div className="space-y-2">
-            <div className="flex flex-wrap gap-1">
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-1.5">
               {WEEKDAYS.map((d) => (
                 <button
                   key={d}
@@ -111,39 +110,37 @@ export function Scheduler() {
                       prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d],
                     )
                   }
-                  className={`rounded-control border px-2 py-1 text-xs uppercase ${
+                  className={`tabular w-10 rounded-control border py-1.5 text-body font-medium uppercase transition-colors ${
                     days.includes(d)
                       ? "border-accent bg-accent text-accent-fg"
-                      : "border-border hover:bg-surface"
+                      : "border-border text-muted hover:border-muted hover:text-text"
                   }`}
                 >
                   {d}
                 </button>
               ))}
             </div>
-            <div className="flex items-end gap-2">
-              <div className="space-y-1">
-                <Label>Hour</Label>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Hour">
                 <Input
                   type="number"
                   min={0}
                   max={23}
-                  className="tabular w-20"
+                  className="tabular"
                   value={hour}
                   onChange={(e) => setHour(clamp(parseInt(e.target.value) || 0, 0, 23))}
                 />
-              </div>
-              <div className="space-y-1">
-                <Label>Minute</Label>
+              </Field>
+              <Field label="Minute">
                 <Input
                   type="number"
                   min={0}
                   max={59}
-                  className="tabular w-20"
+                  className="tabular"
                   value={minute}
                   onChange={(e) => setMinute(clamp(parseInt(e.target.value) || 0, 0, 59))}
                 />
-              </div>
+              </Field>
             </div>
           </div>
         )}
@@ -151,36 +148,38 @@ export function Scheduler() {
         <Button size="sm" onClick={arm}>
           <Clock className="h-4 w-4" /> Arm schedule
         </Button>
-      </div>
+      </Section>
 
-      <div className="space-y-1">
-        <div className="text-xs font-medium text-muted">Armed schedules</div>
+      <Section
+        title="Armed schedules"
+        action={<span className="tabular text-label text-muted">{schedules.length}</span>}
+        bodyClassName={
+          schedules.length === 0
+            ? "p-0"
+            : "p-0 space-y-0 divide-y divide-border/60"
+        }
+      >
         {schedules.length === 0 ? (
-          <p className="text-sm text-muted">None armed.</p>
+          <EmptyState className="border-0" title="No schedules armed yet." />
         ) : (
-          <ul className="space-y-1">
-            {schedules.map((s) => (
-              <li
-                key={s.id}
-                className="flex items-center justify-between rounded-control border border-border px-3 py-2 text-sm"
+          schedules.map((s) => (
+            <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 text-ui">
+              <span className="flex-1 truncate">
+                <span className="text-text">{s.macro_name}</span>
+                <span className="text-muted"> · {scheduleLabel(s)}</span>
+              </span>
+              <span className="tabular text-label text-muted">{countdown(s)}</span>
+              <IconButton
+                label="Cancel schedule"
+                variant="danger"
+                onClick={() => cancelSchedule(s.id)}
               >
-                <span className="flex-1 truncate">
-                  {s.macro_name} · {scheduleLabel(s)}
-                </span>
-                <span className="tabular mr-2 text-muted">{countdown(s)}</span>
-                <button
-                  aria-label="Cancel schedule"
-                  title="Cancel"
-                  onClick={() => cancelSchedule(s.id)}
-                  className="rounded-[4px] p-1 text-muted hover:bg-border/50 hover:text-record"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </li>
-            ))}
-          </ul>
+                <X className="h-4 w-4" />
+              </IconButton>
+            </div>
+          ))
         )}
-      </div>
+      </Section>
     </div>
   );
 }
