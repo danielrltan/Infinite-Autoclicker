@@ -1,8 +1,10 @@
-import { Circle, Play, Square, Dot } from "lucide-react";
+import { Circle, Play, Square, Dot, FilePlus2, Save } from "lucide-react";
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Settings } from "@/components/Settings/Settings";
+import { LibraryButton } from "@/components/Library/Library";
+import { Tooltip } from "@/components/ui/tooltip";
 import { fmtClock } from "@/lib/utils";
 
 export function TopBar() {
@@ -14,6 +16,9 @@ export function TopBar() {
     toggleRecord,
     macroName,
     setMacroName,
+    newMacro,
+    saveCurrent,
+    dirty,
   } = useApp();
 
   const isPlaying = status === "playing";
@@ -57,6 +62,23 @@ export function TopBar() {
             {fmtClock(recording.elapsedMs)} · {recording.count}
           </span>
         )}
+        <LibraryButton />
+        <Tooltip label="New macro">
+          <Button variant="ghost" size="icon" aria-label="New macro" onClick={newMacro}>
+            <FilePlus2 className="h-5 w-5" />
+          </Button>
+        </Tooltip>
+        <Tooltip label={dirty ? "Save (unsaved changes)" : "Save"}>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Save macro"
+            onClick={saveCurrent}
+            className={dirty ? "text-warn" : undefined}
+          >
+            <Save className="h-5 w-5" />
+          </Button>
+        </Tooltip>
         <Settings />
       </div>
     </header>

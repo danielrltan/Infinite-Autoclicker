@@ -100,6 +100,8 @@ pub fn run() {
             commands::find_color_once,
             commands::start_color_trigger,
             commands::stop_color_trigger,
+            commands::start_autoclick,
+            commands::stop_autoclick,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Infinite Autoclicker");

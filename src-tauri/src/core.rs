@@ -8,6 +8,7 @@ use std::thread;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::runtime::Runtime;
 
+use crate::engine::autoclick::{AutoClickOpts, AutoClickSink, AutoClicker};
 use crate::engine::color_trigger::{ColorTrigger, ColorTriggerOpts, TriggerSink};
 use crate::engine::failsafe::is_at_corner;
 use crate::engine::hotkeys::HotkeyManager;
@@ -31,6 +32,7 @@ pub struct AppCore {
     pub recorder: Arc<Recorder>,
     pub hotkeys: Arc<HotkeyManager>,
     pub color_trigger: Arc<ColorTrigger>,
+    pub autoclicker: Arc<AutoClicker>,
     pub scheduler: Arc<Scheduler>,
     pub settings: Arc<Mutex<Settings>>,
     pub status: Arc<Mutex<AppState>>,
@@ -45,6 +47,7 @@ impl AppCore {
         let recorder = Arc::new(Recorder::new());
         let hotkeys = Arc::new(HotkeyManager::new(settings.hotkeys.clone()));
         let color_trigger = Arc::new(ColorTrigger::new(Arc::clone(&backend)));
+        let autoclicker = Arc::new(AutoClicker::new(Arc::clone(&backend)));
         let status = Arc::new(Mutex::new(AppState::Idle));
         let monitors = Arc::new(Mutex::new(current_monitors(&app)));
         let rt = Arc::new(
@@ -74,6 +77,7 @@ impl AppCore {
             recorder,
             hotkeys,
             color_trigger,
+            autoclicker,
             scheduler,
             settings: Arc::new(Mutex::new(settings)),
             status,
@@ -113,10 +117,21 @@ impl AppCore {
         self.color_trigger.start(opts, sink);
     }
 
+    pub fn start_autoclick(&self, app: &AppHandle, opts: AutoClickOpts) {
+        let monitors = self.refresh_monitors(app);
+        self.set_status(app, AppState::Playing);
+        let sink = Arc::new(AutoClickTauriSink {
+            app: app.clone(),
+            status: Arc::clone(&self.status),
+        });
+        self.autoclicker.start_with(opts, monitors, sink);
+    }
+
     /// Hard stop everything user-initiated (Stop button).
     pub fn stop_all(&self) {
         self.player.stop();
         self.color_trigger.stop();
+        self.autoclicker.stop();
     }
 }
 
@@ -215,25 +230,52 @@ impl TriggerSink for TriggerTauriSink {
         );
     }
     fn finished(&self, total: u32, panicked: bool) {
+        emit_live_finished(&self.app, &self.status, total, panicked);
+    }
+}
+
+struct AutoClickTauriSink {
+    app: AppHandle,
+    status: Arc<Mutex<AppState>>,
+}
+
+impl AutoClickSink for AutoClickTauriSink {
+    fn clicked(&self, total: u32) {
         let _ = self.app.emit(
-            names::PLAYBACK_FINISHED,
-            PlaybackFinished {
-                loops_completed: total,
-                reason: if panicked {
-                    crate::ipc::events::FinishReason::Panic
-                } else {
-                    crate::ipc::events::FinishReason::Stopped
-                },
-            },
-        );
-        *self.status.lock().unwrap() = AppState::Idle;
-        let _ = self.app.emit(
-            names::STATUS_CHANGED,
-            StatusChanged {
-                state: AppState::Idle,
+            names::PLAYBACK_PROGRESS,
+            PlaybackProgress {
+                loop_index: total,
+                event_index: 0,
+                total_events: 0,
+                total_loops: None,
             },
         );
     }
+    fn finished(&self, total: u32, panicked: bool) {
+        emit_live_finished(&self.app, &self.status, total, panicked);
+    }
+}
+
+/// Shared finish handling for the live tools (color trigger + autoclicker).
+fn emit_live_finished(app: &AppHandle, status: &Arc<Mutex<AppState>>, total: u32, panicked: bool) {
+    let _ = app.emit(
+        names::PLAYBACK_FINISHED,
+        PlaybackFinished {
+            loops_completed: total,
+            reason: if panicked {
+                crate::ipc::events::FinishReason::Panic
+            } else {
+                crate::ipc::events::FinishReason::Stopped
+            },
+        },
+    );
+    *status.lock().unwrap() = AppState::Idle;
+    let _ = app.emit(
+        names::STATUS_CHANGED,
+        StatusChanged {
+            state: AppState::Idle,
+        },
+    );
 }
 
 // ── Listener consumer ──────────────────────────────────────────────
@@ -289,6 +331,7 @@ fn handle_hotkey(core: &AppCore, app: &AppHandle, action: HotkeyAction) {
             if enabled {
                 core.player.panic();
                 core.color_trigger.panic();
+                core.autoclicker.panic();
             }
             let _ = app.emit(
                 names::HOTKEY_TRIGGERED,
@@ -302,7 +345,9 @@ fn handle_hotkey(core: &AppCore, app: &AppHandle, action: HotkeyAction) {
         other => {
             // Instant Rust-side stop if play/stop is pressed while running.
             if matches!(other, HotkeyAction::PlayStop)
-                && (core.player.is_playing() || core.color_trigger.is_running())
+                && (core.player.is_playing()
+                    || core.color_trigger.is_running()
+                    || core.autoclicker.is_running())
             {
                 core.stop_all();
             }
@@ -312,7 +357,9 @@ fn handle_hotkey(core: &AppCore, app: &AppHandle, action: HotkeyAction) {
 }
 
 fn maybe_corner_failsafe(core: &AppCore, app: &AppHandle, x: i32, y: i32) {
-    let playing = core.player.is_playing() || core.color_trigger.is_running();
+    let playing = core.player.is_playing()
+        || core.color_trigger.is_running()
+        || core.autoclicker.is_running();
     if !playing {
         return;
     }
@@ -320,17 +367,19 @@ fn maybe_corner_failsafe(core: &AppCore, app: &AppHandle, x: i32, y: i32) {
     if !cfg.corner_failsafe_enabled {
         return;
     }
-    // Ignore the player's own synthesized moves.
+    // Ignore our own synthesized moves.
     let (sx, sy) = core.player.last_synth();
     let (tx, ty) = core.color_trigger.last_synth();
+    let (ax2, ay2) = core.autoclicker.last_synth();
     let near_synth = |ax: i32, ay: i32| (x - ax).abs() <= 2 && (y - ay).abs() <= 2;
-    if near_synth(sx, sy) || near_synth(tx, ty) {
+    if near_synth(sx, sy) || near_synth(tx, ty) || near_synth(ax2, ay2) {
         return;
     }
     let monitors = core.monitors.lock().unwrap().clone();
     if is_at_corner(x, y, &monitors, cfg.corner_threshold_px) {
         core.player.panic();
         core.color_trigger.panic();
+        core.autoclicker.panic();
         let _ = app.emit(
             names::HOTKEY_TRIGGERED,
             HotkeyTriggered {

@@ -19,6 +19,7 @@ import {
 } from "@/lib/compile";
 import type {
   AppState,
+  AutoClickOpts,
   CaptureMode,
   ColorTriggerOpts,
   JitterConfig,
@@ -33,7 +34,7 @@ import type {
   Source,
 } from "@/lib/types";
 
-export type Tab = "steps" | "recorded" | "color" | "schedule";
+export type Tab = "autoclick" | "steps" | "recorded" | "color" | "schedule";
 export interface ToastAction {
   label: string;
   onClick: () => void | Promise<void>;
@@ -81,6 +82,10 @@ interface AppContextValue {
   setSpeed: (n: number) => void;
   jitter: JitterConfig;
   setJitter: (j: JitterConfig) => void;
+  // auto clicker
+  autoclick: AutoClickOpts;
+  setAutoclick: (o: AutoClickOpts) => void;
+  startAutoclick: () => Promise<void>;
   // record opts
   recordMode: CaptureMode;
   setRecordMode: (m: CaptureMode) => void;
@@ -149,7 +154,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     input_monitoring: true,
   });
 
-  const [tab, setTab] = useState<Tab>("steps");
+  const [tab, setTab] = useState<Tab>("autoclick");
   const [macroName, setMacroName] = useState("Untitled macro");
   const [source, setSource] = useState<Source>("built");
   const [steps, setSteps] = useState<Step[]>([]);
@@ -163,6 +168,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     timing_pct: 0,
     path_deviation_px: 0,
   });
+
+  const [autoclick, setAutoclickState] = useState<AutoClickOpts>(loadAutoclick);
+  const setAutoclick = useCallback((o: AutoClickOpts) => {
+    setAutoclickState(o);
+    try {
+      localStorage.setItem("iac.autoclick", JSON.stringify(o));
+    } catch {
+      /* localStorage unavailable: keep in-memory only */
+    }
+  }, []);
 
   const [recordMode, setRecordMode] = useState<CaptureMode>("full_motion");
   const [captureKeyboard, setCaptureKeyboard] = useState(true);
@@ -478,7 +493,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [macroName, source, repeat, speed],
   );
 
+  const startAutoclick = useCallback(async () => {
+    setColorClicks(0);
+    await ipc.startAutoclick(autoclick);
+  }, [autoclick]);
+
   const play = useCallback(async () => {
+    // On the Auto Clicker tab, Play/F8 starts the clicker.
+    if (tab === "autoclick") {
+      await startAutoclick();
+      return;
+    }
     let evs: MacroEvent[];
     if (source === "recorded") {
       evs = recordedEvents;
@@ -491,7 +516,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
     await ipc.playMacro(buildMacro(evs), { repeat, speed, jitter });
-  }, [source, recordedEvents, steps, repeat, speed, jitter, buildMacro, toast]);
+  }, [tab, startAutoclick, source, recordedEvents, steps, repeat, speed, jitter, buildMacro, toast]);
 
   const stop = useCallback(async () => {
     await ipc.stopPlayback();
@@ -795,6 +820,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSpeed: setSpeedDirty,
     jitter,
     setJitter: setJitterDirty,
+    autoclick,
+    setAutoclick,
+    startAutoclick,
     recordMode,
     setRecordMode,
     captureKeyboard,
@@ -847,6 +875,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
       />
     </Ctx.Provider>
   );
+}
+
+function defaultAutoclick(): AutoClickOpts {
+  return {
+    interval_ms: 100,
+    button: "left",
+    clicks_per_event: 1,
+    repeat: 0,
+    use_fixed_pos: false,
+    x: 0,
+    y: 0,
+    jitter_time_pct: 0,
+    jitter_pos_px: 0,
+    key_code: null,
+  };
+}
+
+// Auto-clicker settings persist between launches (OP Auto Clicker behavior).
+function loadAutoclick(): AutoClickOpts {
+  try {
+    const raw = localStorage.getItem("iac.autoclick");
+    if (raw) return { ...defaultAutoclick(), ...JSON.parse(raw) };
+  } catch {
+    /* ignore */
+  }
+  return defaultAutoclick();
 }
 
 function errMessage(e: unknown): string {

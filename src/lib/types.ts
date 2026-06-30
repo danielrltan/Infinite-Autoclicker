@@ -156,6 +156,28 @@ export interface CursorPos {
   y: number;
 }
 
+// ── Auto Clicker (OP Auto Clicker / Murgee parity) ─────────────────
+
+export interface AutoClickOpts {
+  /** Delay between clicks in milliseconds (sum of the h/m/s/ms inputs). */
+  interval_ms: number;
+  button: MouseButton;
+  /** 1 = single, 2 = double, 3 = triple. */
+  clicks_per_event: number;
+  /** 0 = repeat until stopped. */
+  repeat: number;
+  /** false = click at the current cursor location (don't move it). */
+  use_fixed_pos: boolean;
+  x: number;
+  y: number;
+  /** Randomize each interval ±pct (0 = off). */
+  jitter_time_pct: number;
+  /** Random position offset radius px, fixed-position only (0 = off). */
+  jitter_pos_px: number;
+  /** Key-presser mode: press this key code each tick instead of clicking. */
+  key_code: string | null;
+}
+
 // ── Color Trigger / vision (owner request) ─────────────────────────
 
 export interface Rgb {

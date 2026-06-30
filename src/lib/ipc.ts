@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AppError,
+  AutoClickOpts,
   Blob,
   ColorMatchConfig,
   ColorTriggerOpts,
@@ -94,6 +95,11 @@ export const ipc = {
   startColorTrigger: (opts: ColorTriggerOpts) =>
     invoke<void>("start_color_trigger", { opts }),
   stopColorTrigger: () => invoke<void>("stop_color_trigger"),
+
+  // Auto Clicker
+  startAutoclick: (opts: AutoClickOpts) =>
+    invoke<void>("start_autoclick", { opts }),
+  stopAutoclick: () => invoke<void>("stop_autoclick"),
 };
 
 // ── Events (Rust → UI) ─────────────────────────────────────────────

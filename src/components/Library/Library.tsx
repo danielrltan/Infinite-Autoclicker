@@ -1,5 +1,5 @@
 import * as React from "react";
-import { FilePlus2, Save, Trash2, FileText, RotateCcw, X } from "lucide-react";
+import { Trash2, FileText, RotateCcw, X, FolderOpen, Library as LibraryIcon } from "lucide-react";
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,73 +9,80 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Tooltip } from "@/components/ui/tooltip";
 import { ipc } from "@/lib/ipc";
 import type { MacroMeta, TrashEntry } from "@/lib/types";
 
-export function Library() {
-  const { library, newMacro, saveCurrent, loadFromLibrary, deleteFromLibrary, dirty } =
-    useApp();
+/** Top-bar button that opens the macro library in a dialog (not a nav tab). */
+export function LibraryButton() {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Tooltip label="Library">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Open library"
+          onClick={() => setOpen(true)}
+        >
+          <LibraryIcon className="h-5 w-5" />
+        </Button>
+      </Tooltip>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Library</DialogTitle>
+          <DialogDescription>
+            Open a saved macro, or manage Trash. Opening one loads it into the editor.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[70vh] overflow-auto">
+          <LibraryPanel onOpened={() => setOpen(false)} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Saved macros as cards, plus the Trash. Used inside the Library dialog. */
+export function LibraryPanel({ onOpened }: { onOpened?: () => void }) {
+  const { library, loadFromLibrary, deleteFromLibrary } = useApp();
   const [trashOpen, setTrashOpen] = React.useState(false);
 
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-border bg-surface">
-      <div className="flex items-center justify-between px-3 py-3">
-        <span className="text-sm font-semibold">Library</span>
-        {dirty && (
-          <span
-            className="tabular text-[11px] text-warn"
-            title="Unsaved changes"
-            aria-label="Unsaved changes"
-          >
-            ● Unsaved
-          </span>
-        )}
-      </div>
-      <div className="flex gap-1 px-3 pb-2">
-        <Button size="sm" variant="secondary" className="flex-1" onClick={newMacro}>
-          <FilePlus2 className="h-4 w-4" /> New
-        </Button>
-        <Button size="sm" variant="secondary" className="flex-1" onClick={saveCurrent}>
-          <Save className="h-4 w-4" /> Save
-        </Button>
-      </div>
-
-      <div className="flex-1 overflow-auto px-2 pb-3">
-        {library.length === 0 ? (
-          <p className="px-2 py-4 text-xs text-muted">
-            No saved macros yet. Build or record one, then Save.
-          </p>
-        ) : (
-          <ul className="space-y-1">
-            {library.map((m) => (
-              <LibraryRow
-                key={m.path}
-                m={m}
-                onOpen={() => loadFromLibrary(m)}
-                onDelete={() => deleteFromLibrary(m)}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <div className="border-t border-border px-3 py-2">
-        <Button
-          size="sm"
-          variant="ghost"
-          className="w-full justify-start text-muted hover:text-text"
-          onClick={() => setTrashOpen(true)}
-        >
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold">Saved macros</h2>
+        <Button size="sm" variant="ghost" onClick={() => setTrashOpen(true)}>
           <Trash2 className="h-4 w-4" /> Trash
         </Button>
       </div>
 
+      {library.length === 0 ? (
+        <p className="rounded-card border border-dashed border-border p-8 text-center text-sm text-muted">
+          No saved macros yet. Build or record one, then Save.
+        </p>
+      ) : (
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {library.map((m) => (
+            <MacroCard
+              key={m.path}
+              m={m}
+              onOpen={async () => {
+                await loadFromLibrary(m);
+                onOpened?.();
+              }}
+              onDelete={() => deleteFromLibrary(m)}
+            />
+          ))}
+        </ul>
+      )}
+
       <TrashDialog open={trashOpen} onOpenChange={setTrashOpen} />
-    </aside>
+    </div>
   );
 }
 
-function LibraryRow({
+function MacroCard({
   m,
   onOpen,
   onDelete,
@@ -85,37 +92,26 @@ function LibraryRow({
   onDelete: () => void;
 }) {
   return (
-    <li className="group">
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={onOpen}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onOpen();
-          }
-        }}
-        className="flex items-center gap-2 rounded-control px-2 py-2 text-sm hover:bg-bg focus-visible:outline-2 focus-visible:outline-accent"
-      >
-        <FileText className="h-4 w-4 shrink-0 text-muted" />
-        <div className="min-w-0 flex-1">
-          <div className="truncate">{m.name}</div>
-          <div className="tabular text-[11px] text-muted">
-            {m.source} · {m.event_count} events
-          </div>
+    <li className="group flex items-start gap-2 rounded-card border border-border bg-surface p-3">
+      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted" />
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-medium">{m.name}</div>
+        <div className="tabular text-[11px] text-muted">
+          {m.source} · {m.event_count} events
         </div>
-        <button
-          aria-label={`Delete ${m.name}`}
-          title="Delete"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="rounded-[4px] p-1 text-muted opacity-0 transition-opacity hover:text-record focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-accent group-hover:opacity-100"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <div className="mt-2 flex gap-1">
+          <Button size="sm" variant="secondary" onClick={onOpen}>
+            <FolderOpen className="h-3.5 w-3.5" /> Open
+          </Button>
+          <button
+            aria-label={`Delete ${m.name}`}
+            title="Delete"
+            onClick={onDelete}
+            className="rounded-control p-1.5 text-muted transition-colors hover:bg-border/50 hover:text-record focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </li>
   );

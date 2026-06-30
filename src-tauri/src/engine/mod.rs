@@ -1,3 +1,4 @@
+pub mod autoclick;
 pub mod color_trigger;
 pub mod failsafe;
 pub mod hotkeys;

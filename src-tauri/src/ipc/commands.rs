@@ -7,6 +7,7 @@ use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_store::StoreExt;
 
 use crate::core::{current_monitors, AppCore};
+use crate::engine::autoclick::AutoClickOpts;
 use crate::engine::color_trigger::ColorTriggerOpts;
 use crate::engine::hotkeys::conflicts;
 use crate::engine::screen;
@@ -387,6 +388,18 @@ pub fn start_color_trigger(app: AppHandle, core: State<AppCore>, opts: ColorTrig
 #[tauri::command]
 pub fn stop_color_trigger(core: State<AppCore>) {
     core.color_trigger.stop();
+}
+
+// ── Auto Clicker (OP / Murgee parity) ──────────────────────────────
+
+#[tauri::command]
+pub fn start_autoclick(app: AppHandle, core: State<AppCore>, opts: AutoClickOpts) {
+    core.start_autoclick(&app, opts);
+}
+
+#[tauri::command]
+pub fn stop_autoclick(core: State<AppCore>) {
+    core.autoclicker.stop();
 }
 
 // Suppress unused warning for Source re-export used only by other modules.
