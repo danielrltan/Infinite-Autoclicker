@@ -115,11 +115,8 @@ export function ColorTrigger() {
             />
           </div>
           <Button size="sm" variant="outline" onClick={pick}>
-            <Pipette className="h-4 w-4" /> Eyedropper: color under cursor
+            <Pipette className="h-4 w-4" /> Eyedropper
           </Button>
-          <p className="text-xs text-muted">
-            Hover the target on screen, then click the eyedropper.
-          </p>
         </div>
 
         <div className="space-y-3 rounded-card border border-border bg-surface p-3">
