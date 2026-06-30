@@ -106,6 +106,10 @@ export const ipc = {
   setRecordOpts: (opts: RecordOpts) => invoke<void>("set_record_opts", { opts }),
   setPlayIntent: (intent: PlayIntent) =>
     invoke<void>("set_play_intent", { intent }),
+
+  // Drag-to-select screen region (Color Trigger)
+  startRegionCapture: () => invoke<void>("start_region_capture"),
+  cancelRegionCapture: () => invoke<void>("cancel_region_capture"),
 };
 
 // ── Events (Rust → UI) ─────────────────────────────────────────────

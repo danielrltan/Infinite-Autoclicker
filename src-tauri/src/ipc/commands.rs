@@ -414,6 +414,22 @@ pub fn set_play_intent(core: State<AppCore>, intent: PlayIntent) {
     *core.play_intent.lock().unwrap() = intent;
 }
 
+// ── Drag-to-select region capture (Color Trigger) ──────────────────
+
+#[tauri::command]
+pub fn start_region_capture(core: State<AppCore>) {
+    let mut rc = core.region_capture.lock().unwrap();
+    rc.active = true;
+    rc.start = None;
+}
+
+#[tauri::command]
+pub fn cancel_region_capture(core: State<AppCore>) {
+    let mut rc = core.region_capture.lock().unwrap();
+    rc.active = false;
+    rc.start = None;
+}
+
 // Suppress unused warning for Source re-export used only by other modules.
 #[allow(dead_code)]
 fn _uses(_: Source) {}

@@ -1004,9 +1004,9 @@ function defaultSettings(): Settings {
   return {
     theme: "system",
     hotkeys: {
-      record_toggle: "F9",
-      play_stop_toggle: "F8",
-      capture_cursor: "F6",
+      record_toggle: "F5",
+      play_stop_toggle: "F6",
+      capture_cursor: "F7",
       panic: "F12",
     },
     failsafe: {

@@ -206,7 +206,8 @@ export interface ColorMatchConfig {
   target: Rgb;
   /** Euclidean RGB distance threshold (0–441). */
   tolerance: number;
-  region: Rect | null;
+  /** Search regions in screen px; empty scans the whole screen. */
+  regions: Rect[];
   min_blob_px: number;
 }
 

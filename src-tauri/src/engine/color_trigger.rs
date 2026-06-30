@@ -16,7 +16,7 @@ use super::vision::ColorMatchConfig;
 use crate::input::backend::InputBackend;
 use crate::model::{KeyAction, MouseButton};
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColorTriggerOpts {
     #[serde(rename = "match")]
     pub match_cfg: ColorMatchConfig,

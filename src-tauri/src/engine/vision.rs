@@ -25,13 +25,14 @@ pub struct Rect {
     pub h: i32,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColorMatchConfig {
     pub target: Rgb,
     /// Euclidean RGB distance threshold (0–441). ~30–80 works for vivid colors.
     pub tolerance: u32,
-    /// Search region in screen coords; `None` scans the whole captured frame.
-    pub region: Option<Rect>,
+    /// Search regions in screen coords; empty scans the whole captured frame.
+    #[serde(default)]
+    pub regions: Vec<Rect>,
     /// Ignore blobs smaller than this many matched pixels (noise filter).
     pub min_blob_px: u32,
 }
@@ -60,49 +61,20 @@ fn color_dist_sq(a: Rgb, b: Rgb) -> u32 {
     (dr * dr + dg * dg + db * db) as u32
 }
 
-/// Find the largest connected blob of pixels matching the target color. Returns
-/// its centroid in global screen coords, or `None` if nothing passes the filter.
-pub fn find_largest_blob(frame: &Frame, cfg: &ColorMatchConfig) -> Option<Blob> {
-    let fw = frame.width as i32;
-    let fh = frame.height as i32;
-    if fw <= 0 || fh <= 0 {
-        return None;
-    }
-
-    // Scan window in *local* frame coordinates, clamped to the region if given.
-    let (mut sx0, mut sy0, mut sx1, mut sy1) = (0, 0, fw, fh);
-    if let Some(r) = cfg.region {
-        sx0 = (r.x - frame.origin_x).max(0);
-        sy0 = (r.y - frame.origin_y).max(0);
-        sx1 = (r.x - frame.origin_x + r.w).min(fw);
-        sy1 = (r.y - frame.origin_y + r.h).min(fh);
-    }
-    if sx0 >= sx1 || sy0 >= sy1 {
-        return None;
-    }
-
+/// Flood-fill the largest matching component within a local window, updating
+/// `best` = (sum_x, sum_y, area) in frame-local coords.
+fn scan_window(
+    matches: &dyn Fn(i32, i32) -> bool,
+    sx0: i32,
+    sy0: i32,
+    sx1: i32,
+    sy1: i32,
+    best: &mut Option<(u64, u64, u32)>,
+) {
     let sw = (sx1 - sx0) as usize;
-    let sh = (sy1 - sy0) as usize;
-    let tol_sq = cfg.tolerance * cfg.tolerance;
-
-    let matches = |lx: i32, ly: i32| -> bool {
-        let idx = ((ly * fw + lx) as usize) * 4;
-        if idx + 2 >= frame.rgba.len() {
-            return false;
-        }
-        let px = Rgb {
-            r: frame.rgba[idx],
-            g: frame.rgba[idx + 1],
-            b: frame.rgba[idx + 2],
-        };
-        color_dist_sq(px, cfg.target) <= tol_sq
-    };
-
-    let mut visited = vec![false; sw * sh];
+    let mut visited = vec![false; sw * (sy1 - sy0) as usize];
     let local_idx =
         |lx: i32, ly: i32| -> usize { ((ly - sy0) as usize) * sw + (lx - sx0) as usize };
-
-    let mut best: Option<(u64, u64, u32)> = None; // (sum_x, sum_y, area)
     let mut stack: Vec<(i32, i32)> = Vec::new();
 
     for y in sy0..sy1 {
@@ -110,7 +82,6 @@ pub fn find_largest_blob(frame: &Frame, cfg: &ColorMatchConfig) -> Option<Blob> 
             if visited[local_idx(x, y)] || !matches(x, y) {
                 continue;
             }
-            // Flood fill this component (4-connectivity).
             let (mut sum_x, mut sum_y, mut area) = (0u64, 0u64, 0u32);
             stack.clear();
             stack.push((x, y));
@@ -131,9 +102,55 @@ pub fn find_largest_blob(frame: &Frame, cfg: &ColorMatchConfig) -> Option<Blob> 
                 }
             }
             if best.map(|(_, _, a)| area > a).unwrap_or(true) {
-                best = Some((sum_x, sum_y, area));
+                *best = Some((sum_x, sum_y, area));
             }
         }
+    }
+}
+
+/// Find the largest connected blob of pixels matching the target color across
+/// the configured regions (or the whole frame if none). Returns its centroid in
+/// global screen coords, or `None` if nothing passes the filter.
+pub fn find_largest_blob(frame: &Frame, cfg: &ColorMatchConfig) -> Option<Blob> {
+    let fw = frame.width as i32;
+    let fh = frame.height as i32;
+    if fw <= 0 || fh <= 0 {
+        return None;
+    }
+    let tol_sq = cfg.tolerance * cfg.tolerance;
+
+    let matches = |lx: i32, ly: i32| -> bool {
+        let idx = ((ly * fw + lx) as usize) * 4;
+        if idx + 2 >= frame.rgba.len() {
+            return false;
+        }
+        let px = Rgb {
+            r: frame.rgba[idx],
+            g: frame.rgba[idx + 1],
+            b: frame.rgba[idx + 2],
+        };
+        color_dist_sq(px, cfg.target) <= tol_sq
+    };
+
+    // Scan windows in frame-local coords (whole frame, or each region clamped).
+    let windows: Vec<(i32, i32, i32, i32)> = if cfg.regions.is_empty() {
+        vec![(0, 0, fw, fh)]
+    } else {
+        cfg.regions
+            .iter()
+            .filter_map(|r| {
+                let sx0 = (r.x - frame.origin_x).max(0);
+                let sy0 = (r.y - frame.origin_y).max(0);
+                let sx1 = (r.x - frame.origin_x + r.w).min(fw);
+                let sy1 = (r.y - frame.origin_y + r.h).min(fh);
+                (sx0 < sx1 && sy0 < sy1).then_some((sx0, sy0, sx1, sy1))
+            })
+            .collect()
+    };
+
+    let mut best: Option<(u64, u64, u32)> = None;
+    for (sx0, sy0, sx1, sy1) in windows {
+        scan_window(&matches, sx0, sy0, sx1, sy1, &mut best);
     }
 
     let (sum_x, sum_y, area) = best?;
@@ -187,7 +204,7 @@ mod tests {
         ColorMatchConfig {
             target,
             tolerance: tol,
-            region: None,
+            regions: vec![],
             min_blob_px: min,
         }
     }
@@ -277,14 +294,54 @@ mod tests {
             rgba: &data,
         };
         let mut c = cfg(YELLOW, 40, 1);
-        c.region = Some(Rect {
+        c.regions = vec![Rect {
             x: 0,
             y: 0,
             w: 40,
             h: 40,
-        });
+        }];
         let blob = find_largest_blob(&frame, &c).unwrap();
         assert_eq!(blob.area, 36); // the small blob inside the region
+    }
+
+    #[test]
+    fn multiple_regions_scan_each_and_ignore_outside() {
+        // Big blob outside both regions; smaller blobs inside two regions.
+        const W: u32 = 200;
+        let data = buf(
+            W,
+            100,
+            BLUE,
+            &[
+                (90, 40, 30, 30, YELLOW), // big, between regions (excluded)
+                (5, 5, 10, 10, YELLOW),   // inside region A (area 100)
+                (170, 70, 8, 8, YELLOW),  // inside region B (area 64)
+            ],
+        );
+        let frame = Frame {
+            origin_x: 0,
+            origin_y: 0,
+            width: W,
+            height: 100,
+            rgba: &data,
+        };
+        let mut c = cfg(YELLOW, 40, 1);
+        c.regions = vec![
+            Rect {
+                x: 0,
+                y: 0,
+                w: 40,
+                h: 40,
+            },
+            Rect {
+                x: 160,
+                y: 60,
+                w: 40,
+                h: 40,
+            },
+        ];
+        let blob = find_largest_blob(&frame, &c).unwrap();
+        assert_eq!(blob.area, 100); // region A's blob wins; the big middle one is ignored
     }
 
     #[test]

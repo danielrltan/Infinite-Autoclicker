@@ -37,6 +37,14 @@ pub enum PlayIntent {
     Color { opts: ColorTriggerOpts },
 }
 
+/// Drag-to-select-region capture state. While active, the next mouse press→release
+/// captures a screen rectangle (in true screen pixels via the global listener).
+#[derive(Default)]
+pub struct RegionCapture {
+    pub active: bool,
+    pub start: Option<(i32, i32)>,
+}
+
 #[derive(Clone)]
 pub struct AppCore {
     pub backend: Arc<dyn InputBackend>,
@@ -52,6 +60,7 @@ pub struct AppCore {
     pub monitors: Arc<Mutex<Vec<Monitor>>>,
     pub record_opts: Arc<Mutex<RecordOpts>>,
     pub play_intent: Arc<Mutex<PlayIntent>>,
+    pub region_capture: Arc<Mutex<RegionCapture>>,
     pub rt: Arc<Runtime>,
 }
 
@@ -99,6 +108,7 @@ impl AppCore {
             monitors,
             record_opts: Arc::new(Mutex::new(RecordOpts::default())),
             play_intent: Arc::new(Mutex::new(PlayIntent::None)),
+            region_capture: Arc::new(Mutex::new(RegionCapture::default())),
             rt,
         }
     }
@@ -357,6 +367,53 @@ pub fn start_consumer(core: AppCore, app: AppHandle, rx: Receiver<RawInput>) {
 }
 
 fn process_event(core: &AppCore, app: &AppHandle, raw: &RawInput) {
+    // 0) Drag-to-select region capture. While active, a real mouse press→release
+    //    defines a screen rectangle (cursor positions are true screen pixels);
+    //    all input is consumed so the drag doesn't click/record anything.
+    {
+        let mut rc = core.region_capture.lock().unwrap();
+        if rc.active {
+            match raw {
+                RawInput::Button {
+                    action: KeyAction::Press,
+                    ..
+                } => {
+                    rc.start = Some(core.cursor.get());
+                    return;
+                }
+                RawInput::Button {
+                    action: KeyAction::Release,
+                    ..
+                } => {
+                    if let Some((sx, sy)) = rc.start.take() {
+                        let (ex, ey) = core.cursor.get();
+                        rc.active = false;
+                        drop(rc);
+                        let rect = crate::engine::vision::Rect {
+                            x: sx.min(ex),
+                            y: sy.min(ey),
+                            w: (sx - ex).abs().max(1),
+                            h: (sy - ey).abs().max(1),
+                        };
+                        let _ = app.emit(names::REGION_CAPTURED, rect);
+                    }
+                    return;
+                }
+                RawInput::Key {
+                    code,
+                    action: KeyAction::Press,
+                } if code == "Escape" => {
+                    rc.active = false;
+                    rc.start = None;
+                    drop(rc);
+                    let _ = app.emit(names::REGION_CAPTURE_CANCELLED, ());
+                    return;
+                }
+                _ => return, // swallow other input during capture
+            }
+        }
+    }
+
     // 1) Feed the recorder (cursor pos for button events).
     if core.recorder.is_active() {
         let cursor = core.cursor.get();

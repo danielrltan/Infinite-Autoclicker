@@ -127,9 +127,9 @@ pub struct HotkeyConfig {
 impl Default for HotkeyConfig {
     fn default() -> Self {
         Self {
-            record_toggle: "F9".into(),
-            play_stop_toggle: "F8".into(),
-            capture_cursor: "F6".into(),
+            record_toggle: "F5".into(),
+            play_stop_toggle: "F6".into(),
+            capture_cursor: "F7".into(),
             panic: "F12".into(),
         }
     }

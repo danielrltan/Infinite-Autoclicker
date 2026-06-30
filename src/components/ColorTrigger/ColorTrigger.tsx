@@ -1,11 +1,13 @@
-import { useState } from "react";
-import { Pipette, Crosshair, Play } from "lucide-react";
+import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { Pipette, Crosshair, Play, X, SquareDashed } from "lucide-react";
 import { useApp } from "@/store";
 import { ipc } from "@/lib/ipc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, Section } from "@/components/ui/card";
 import { Field, FieldRow } from "@/components/ui/field";
+import { IconButton } from "@/components/ui/icon-button";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -33,16 +35,39 @@ export function ColorTrigger() {
   const [interval, setIntervalMs] = useState(120);
   const [button, setButton] = useState<MouseButton>("left");
   const [moveBefore, setMoveBefore] = useState(true);
-  const [useRegion, setUseRegion] = useState(false);
-  const [region, setRegion] = useState<Rect>({ x: 0, y: 0, w: 800, h: 600 });
+  const [regions, setRegions] = useState<Rect[]>([]);
+  const [capturing, setCapturing] = useState(false);
   const [lastFound, setLastFound] = useState<string | null>(null);
 
   const running = status === "playing" && colorClicks !== null;
 
+  // Drag-to-select: the global listener returns the rectangle in screen pixels.
+  useEffect(() => {
+    const unlisten = Promise.all([
+      listen<Rect>("region:captured", (e) => {
+        setRegions((prev) => [...prev, e.payload]);
+        setCapturing(false);
+      }),
+      listen("region:capture-cancelled", () => setCapturing(false)),
+    ]);
+    return () => {
+      void unlisten.then((us) => us.forEach((u) => u()));
+    };
+  }, []);
+
+  const beginCapture = async () => {
+    setCapturing(true);
+    await ipc.startRegionCapture();
+  };
+  const cancelCapture = async () => {
+    setCapturing(false);
+    await ipc.cancelRegionCapture();
+  };
+
   const cfg = () => ({
     target: color,
     tolerance,
-    region: useRegion ? region : null,
+    regions,
     min_blob_px: minBlob,
   });
 
@@ -154,22 +179,48 @@ export function ColorTrigger() {
       </div>
 
       <Section
-        title="Screen region"
-        action={<Switch checked={useRegion} onCheckedChange={setUseRegion} />}
+        title="Search regions"
+        action={
+          capturing ? (
+            <Button size="sm" variant="destructive" onClick={cancelCapture}>
+              Cancel
+            </Button>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={beginCapture}>
+              <SquareDashed className="h-4 w-4" /> Add region
+            </Button>
+          )
+        }
       >
-        {useRegion && (
-          <div className="grid grid-cols-4 gap-3">
-            {(["x", "y", "w", "h"] as const).map((k) => (
-              <Field key={k} label={k.toUpperCase()}>
-                <Input
-                  type="number"
-                  className="tabular"
-                  value={region[k]}
-                  onChange={(e) => setRegion({ ...region, [k]: parseInt(e.target.value) || 0 })}
-                />
-              </Field>
+        {capturing ? (
+          <p className="text-body text-muted">
+            Drag a rectangle anywhere on screen to add a region. Press{" "}
+            <span className="tabular text-text">Esc</span> to cancel.
+          </p>
+        ) : regions.length === 0 ? (
+          <p className="text-body text-muted">
+            Searching the whole screen. Add regions to limit (and speed up) the search.
+          </p>
+        ) : (
+          <ul className="space-y-1">
+            {regions.map((r, i) => (
+              <li
+                key={i}
+                className="flex items-center gap-3 rounded-control border border-border px-3 py-2 text-ui"
+              >
+                <span className="tabular flex-1 text-muted">
+                  {r.w}×{r.h} at {r.x}, {r.y}
+                </span>
+                <IconButton
+                  label={`Remove region ${i + 1}`}
+                  variant="danger"
+                  onClick={() => setRegions((prev) => prev.filter((_, j) => j !== i))}
+                >
+                  <X className="h-4 w-4" />
+                </IconButton>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </Section>
 

@@ -12,6 +12,8 @@ pub mod names {
     pub const PLAYBACK_FINISHED: &str = "playback:finished";
     pub const STATUS_CHANGED: &str = "status:changed";
     pub const HOTKEY_TRIGGERED: &str = "hotkey:triggered";
+    pub const REGION_CAPTURED: &str = "region:captured";
+    pub const REGION_CAPTURE_CANCELLED: &str = "region:capture-cancelled";
     pub const ERROR: &str = "error";
 }
 

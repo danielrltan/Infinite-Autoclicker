@@ -77,9 +77,9 @@ mod tests {
     #[test]
     fn default_hotkeys_match_actions() {
         let m = HotkeyManager::new(HotkeyConfig::default());
-        assert_eq!(m.match_action("F9"), Some(HotkeyAction::Record));
-        assert_eq!(m.match_action("F8"), Some(HotkeyAction::PlayStop));
-        assert_eq!(m.match_action("F6"), Some(HotkeyAction::Capture));
+        assert_eq!(m.match_action("F5"), Some(HotkeyAction::Record));
+        assert_eq!(m.match_action("F6"), Some(HotkeyAction::PlayStop));
+        assert_eq!(m.match_action("F7"), Some(HotkeyAction::Capture));
         assert_eq!(m.match_action("F12"), Some(HotkeyAction::Panic));
         assert_eq!(m.match_action("KeyA"), None);
     }
