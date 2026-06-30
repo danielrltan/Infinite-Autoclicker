@@ -5,6 +5,7 @@ use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::runtime::Runtime;
 
@@ -22,7 +23,19 @@ use crate::ipc::events::{
     names, AppState, HotkeyAction, HotkeyTriggered, PlaybackFinished, PlaybackProgress,
     RecordingEventAdded, StatusChanged,
 };
-use crate::model::{KeyAction, Macro, Monitor, PlaybackOpts, Settings};
+use crate::model::{KeyAction, Macro, Monitor, PlaybackOpts, RecordOpts, Settings};
+
+/// What the global Play/Stop hotkey (F8) should start when nothing is running.
+/// The frontend pushes this whenever the active mode/data changes, so F8 works
+/// even when the window is minimized (the webview is suspended; Rust isn't).
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PlayIntent {
+    None,
+    Macro { mac: Macro, opts: PlaybackOpts },
+    Autoclick { opts: AutoClickOpts },
+    Color { opts: ColorTriggerOpts },
+}
 
 #[derive(Clone)]
 pub struct AppCore {
@@ -37,6 +50,8 @@ pub struct AppCore {
     pub settings: Arc<Mutex<Settings>>,
     pub status: Arc<Mutex<AppState>>,
     pub monitors: Arc<Mutex<Vec<Monitor>>>,
+    pub record_opts: Arc<Mutex<RecordOpts>>,
+    pub play_intent: Arc<Mutex<PlayIntent>>,
     pub rt: Arc<Runtime>,
 }
 
@@ -82,8 +97,43 @@ impl AppCore {
             settings: Arc::new(Mutex::new(settings)),
             status,
             monitors,
+            record_opts: Arc::new(Mutex::new(RecordOpts::default())),
+            play_intent: Arc::new(Mutex::new(PlayIntent::None)),
             rt,
         }
+    }
+
+    /// Toggle recording entirely in Rust (so F9 works when the window is
+    /// minimized). Uses the last record options pushed by the frontend.
+    pub fn toggle_record(&self, app: &AppHandle) {
+        if self.recorder.is_active() {
+            let monitors = current_monitors(app);
+            let m = self.recorder.stop("Recorded macro", monitors);
+            self.set_status(app, AppState::Idle);
+            let _ = app.emit(
+                names::RECORDING_STOPPED,
+                crate::ipc::events::RecordingStopped { macro_: m },
+            );
+        } else {
+            let opts = *self.record_opts.lock().unwrap();
+            self.recorder.start(opts);
+            self.set_status(app, AppState::Recording);
+        }
+    }
+
+    /// Execute the cached play intent (F8 when nothing is running).
+    pub fn play_intent(&self, app: &AppHandle) {
+        let intent = self.play_intent.lock().unwrap().clone();
+        match intent {
+            PlayIntent::Macro { mac, opts } => self.start_playback(app, mac, opts),
+            PlayIntent::Autoclick { opts } => self.start_autoclick(app, opts),
+            PlayIntent::Color { opts } => self.start_color_trigger(app, opts),
+            PlayIntent::None => {}
+        }
+    }
+
+    pub fn anything_running(&self) -> bool {
+        self.player.is_playing() || self.color_trigger.is_running() || self.autoclicker.is_running()
     }
 
     pub fn set_status(&self, app: &AppHandle, state: AppState) {
@@ -340,18 +390,38 @@ fn handle_hotkey(core: &AppCore, app: &AppHandle, action: HotkeyAction) {
                 },
             );
         }
-        // Record / Play-Stop / Capture: forward to the UI (works unfocused; the
-        // UI holds the current macro + options).
-        other => {
-            // Instant Rust-side stop if play/stop is pressed while running.
-            if matches!(other, HotkeyAction::PlayStop)
-                && (core.player.is_playing()
-                    || core.color_trigger.is_running()
-                    || core.autoclicker.is_running())
-            {
+        // Record + Play/Stop are handled entirely in Rust so they work even when
+        // the window is minimized (the webview is suspended then).
+        HotkeyAction::Record => {
+            core.toggle_record(app);
+            let _ = app.emit(
+                names::HOTKEY_TRIGGERED,
+                HotkeyTriggered {
+                    action: HotkeyAction::Record,
+                },
+            );
+        }
+        HotkeyAction::PlayStop => {
+            if core.anything_running() {
                 core.stop_all();
+            } else {
+                core.play_intent(app);
             }
-            let _ = app.emit(names::HOTKEY_TRIGGERED, HotkeyTriggered { action: other });
+            let _ = app.emit(
+                names::HOTKEY_TRIGGERED,
+                HotkeyTriggered {
+                    action: HotkeyAction::PlayStop,
+                },
+            );
+        }
+        // Capture fills a Step field — needs the focused editor, so route to UI.
+        HotkeyAction::Capture => {
+            let _ = app.emit(
+                names::HOTKEY_TRIGGERED,
+                HotkeyTriggered {
+                    action: HotkeyAction::Capture,
+                },
+            );
         }
     }
 }

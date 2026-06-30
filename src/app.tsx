@@ -4,10 +4,14 @@ import {
   Circle,
   Sparkles,
   Clock,
+  Square,
+  Dot,
 } from "lucide-react";
 import { useApp } from "@/store";
+import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { fmtClock } from "@/lib/utils";
 import { TopBar } from "@/components/TopBar";
 import { StatusBar } from "@/components/StatusBar";
 import { Toasts } from "@/components/Toasts";
@@ -95,12 +99,33 @@ export default function App() {
   );
 }
 
-/** Recorder capture options shown above the recorded-events list. */
+/** Record button + capture options shown above the recorded-events list. */
 function RecorderControls() {
-  const { recordMode, setRecordMode, captureKeyboard, setCaptureKeyboard, recording } =
-    useApp();
+  const {
+    recordMode,
+    setRecordMode,
+    captureKeyboard,
+    setCaptureKeyboard,
+    recording,
+    toggleRecord,
+  } = useApp();
   return (
     <div className="flex flex-wrap items-center gap-4 rounded-card border border-border bg-surface p-3 text-sm">
+      {recording.active ? (
+        <Button variant="record" onClick={toggleRecord}>
+          <Square className="h-4 w-4 fill-current" /> Stop (F9)
+        </Button>
+      ) : (
+        <Button variant="secondary" onClick={toggleRecord}>
+          <Circle className="h-4 w-4 fill-record text-record" /> Record (F9)
+        </Button>
+      )}
+      {recording.active && (
+        <span className="tabular flex items-center gap-1.5 text-record">
+          <Dot className="h-5 w-5 animate-pulse-rec fill-current" />
+          {fmtClock(recording.elapsedMs)} · {recording.count} events
+        </span>
+      )}
       <span className="text-xs font-medium text-muted">Capture</span>
       <label className="flex items-center gap-2">
         <input
@@ -131,9 +156,6 @@ function RecorderControls() {
         />
         Capture keyboard
       </label>
-      <span className="ml-auto text-xs text-muted">
-        Press {" "}Record (F9){" "} to start.
-      </span>
     </div>
   );
 }

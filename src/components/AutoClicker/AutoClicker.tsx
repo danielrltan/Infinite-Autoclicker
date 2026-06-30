@@ -207,9 +207,9 @@ export function AutoClicker() {
       )}
 
       {/* Humanization (Murgee random delay) */}
-      <Section title="Randomize (optional)">
+      <Section title="Randomized delay (optional)">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label={`Interval ±${Math.round(autoclick.jitter_time_pct * 100)}%`}>
+          <Field label={`Random delay ±${Math.round(autoclick.jitter_time_pct * 100)}%`}>
             <Slider
               min={0}
               max={50}

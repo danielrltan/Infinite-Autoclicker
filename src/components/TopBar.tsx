@@ -1,4 +1,4 @@
-import { Circle, Play, Square, Dot, FilePlus2, Save } from "lucide-react";
+import { Play, Square, Dot, FilePlus2, Save } from "lucide-react";
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,6 @@ export function TopBar() {
     recording,
     play,
     stop,
-    toggleRecord,
     macroName,
     setMacroName,
     newMacro,
@@ -26,16 +25,6 @@ export function TopBar() {
 
   return (
     <header className="flex items-center gap-3 border-b border-border bg-bg px-4 py-2.5">
-      {isRecording ? (
-        <Button variant="record" onClick={toggleRecord}>
-          <Square className="h-4 w-4 fill-current" /> Stop
-        </Button>
-      ) : (
-        <Button variant="secondary" onClick={toggleRecord} disabled={isPlaying}>
-          <Circle className="h-4 w-4 fill-record text-record" /> Record
-        </Button>
-      )}
-
       {isPlaying ? (
         <Button variant="destructive" onClick={stop}>
           <Square className="h-4 w-4 fill-current" /> Stop

@@ -27,6 +27,7 @@ import type {
   MacroEvent,
   MacroMeta,
   PermissionStatus,
+  PlayIntent,
   Schedule,
   ScheduleInfo,
   SessionType,
@@ -326,7 +327,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await refreshSchedules();
 
       unsub = await subscribe({
-        onStatusChanged: (p) => setStatus(p.state),
+        onStatusChanged: (p) => {
+          setStatus(p.state);
+          // Recording can be started from Rust (F9 while minimized), so the
+          // recording UI state follows the backend status, not the button.
+          if (p.state === "recording") {
+            setRecording((r) => {
+              if (r.active) return r;
+              recStart.current = Date.now();
+              return { active: true, count: 0, elapsedMs: 0 };
+            });
+          } else {
+            setRecording((r) =>
+              r.active ? { active: false, count: 0, elapsedMs: 0 } : r,
+            );
+          }
+        },
         onRecordingEventAdded: (p) =>
           setRecording((r) => ({ ...r, count: p.count })),
         onRecordingStopped: (p) => {
@@ -481,7 +497,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (stepId: string) => {
       if (recording.active) {
         await ipc.stopRecording();
-        setRecording({ active: false, count: 0, elapsedMs: 0 });
         return;
       }
       recordingStepRef.current = stepId;
@@ -490,8 +505,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         motion_sample_ms: 15,
         capture_keyboard: captureKeyboard,
       });
-      recStart.current = Date.now();
-      setRecording({ active: true, count: 0, elapsedMs: 0 });
     },
     [recording.active, recordMode, captureKeyboard],
   );
@@ -569,31 +582,61 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await ipc.stopColorTrigger().catch(() => {});
   }, []);
 
+  // Recording UI state follows backend status:changed (see subscribe), so these
+  // just issue the command.
   const toggleRecord = useCallback(async () => {
     if (recording.active) {
       await ipc.stopRecording();
-      setRecording({ active: false, count: 0, elapsedMs: 0 });
     } else {
       await ipc.startRecording({
         capture_mode: recordMode,
         motion_sample_ms: 15,
         capture_keyboard: captureKeyboard,
       });
-      recStart.current = Date.now();
-      setRecording({ active: true, count: 0, elapsedMs: 0 });
     }
   }, [recording.active, recordMode, captureKeyboard]);
 
-  // ── Hotkey routing (works unfocused) ─────────────────────────────
+  // ── Hotkey routing ───────────────────────────────────────────────
+  // Record, Play/Stop and Panic are handled in Rust (so they work even when the
+  // window is minimized). Only Capture needs the focused editor.
   const handleHotkeyRef = useRef<(a: string) => void>();
   handleHotkeyRef.current = (action: string) => {
-    if (action === "record") void toggleRecord();
-    else if (action === "play_stop") {
-      if (status === "playing") void stop();
-      else void play();
-    } else if (action === "capture") void captureCursorInto("click");
-    // panic is handled in Rust; UI just reflects via playback:finished
+    if (action === "capture") void captureCursorInto("click");
   };
+
+  // Keep the backend's record options + play intent fresh so F9/F8 act
+  // correctly even while the webview is suspended (minimized).
+  useEffect(() => {
+    ipc
+      .setRecordOpts({
+        capture_mode: recordMode,
+        motion_sample_ms: 15,
+        capture_keyboard: captureKeyboard,
+      })
+      .catch(() => {});
+  }, [recordMode, captureKeyboard]);
+
+  useEffect(() => {
+    let intent: PlayIntent;
+    if (tab === "autoclick") {
+      intent = { kind: "autoclick", opts: autoclick };
+    } else if (tab === "steps") {
+      intent = {
+        kind: "macro",
+        mac: buildMacro(compileSteps(steps)),
+        opts: { repeat, speed, jitter },
+      };
+    } else if (tab === "recorded") {
+      intent = {
+        kind: "macro",
+        mac: buildMacro(recordedEvents),
+        opts: { repeat, speed, jitter },
+      };
+    } else {
+      intent = { kind: "none" };
+    }
+    ipc.setPlayIntent(intent).catch(() => {});
+  }, [tab, autoclick, steps, recordedEvents, repeat, speed, jitter, buildMacro]);
 
   // ── Files ────────────────────────────────────────────────────────
   const newMacro = useCallback(async () => {

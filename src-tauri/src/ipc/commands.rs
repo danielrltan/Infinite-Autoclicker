@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_store::StoreExt;
 
-use crate::core::{current_monitors, AppCore};
+use crate::core::{current_monitors, AppCore, PlayIntent};
 use crate::engine::autoclick::AutoClickOpts;
 use crate::engine::color_trigger::ColorTriggerOpts;
 use crate::engine::hotkeys::conflicts;
@@ -400,6 +400,18 @@ pub fn start_autoclick(app: AppHandle, core: State<AppCore>, opts: AutoClickOpts
 #[tauri::command]
 pub fn stop_autoclick(core: State<AppCore>) {
     core.autoclicker.stop();
+}
+
+// ── Background-hotkey intent caches (F9 record / F8 play work minimized) ────
+
+#[tauri::command]
+pub fn set_record_opts(core: State<AppCore>, opts: RecordOpts) {
+    *core.record_opts.lock().unwrap() = opts;
+}
+
+#[tauri::command]
+pub fn set_play_intent(core: State<AppCore>, intent: PlayIntent) {
+    *core.play_intent.lock().unwrap() = intent;
 }
 
 // Suppress unused warning for Source re-export used only by other modules.
