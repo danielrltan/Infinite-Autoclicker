@@ -1,0 +1,45 @@
+[package]
+name = "infinite-autoclicker"
+version = "0.1.0"
+description = "Free, open-source auto-clicker and macro recorder. No telemetry, no network."
+authors = ["Infinite Autoclicker contributors"]
+edition = "2021"
+rust-version = "1.77"
+license = "MIT"
+
+# The library that the desktop binary links against. Keeping logic in a lib
+# crate lets us unit-test coords/timing/jitter/serde without a webview.
+[lib]
+name = "infinite_autoclicker_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-store = "2"
+tauri-plugin-os = "2"
+tauri-plugin-dialog = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Input: rdev does global listen + simulate; enigo is the simulate fallback (SPEC §3).
+rdev = "0.5"
+enigo = "0.3"
+
+tokio = { version = "1", features = ["rt-multi-thread", "time", "sync", "macros"] }
+thiserror = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+xcap = "0.9.6"
+
+# macOS permission status uses framework-linked FFI (ApplicationServices / IOKit)
+# declared inline in input/macos.rs — no extra crates needed. Deep-links use `open`.
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

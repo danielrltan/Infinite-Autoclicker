@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Core, store, os, and dialog access for the main window. No network permissions (privacy guarantee, SPEC §F9).",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "store:default",
+    "os:default",
+    "dialog:default"
+  ]
+}
