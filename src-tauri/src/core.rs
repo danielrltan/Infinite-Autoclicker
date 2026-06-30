@@ -11,7 +11,7 @@ use tokio::runtime::Runtime;
 
 use crate::engine::autoclick::{AutoClickOpts, AutoClickSink, AutoClicker};
 use crate::engine::color_trigger::{ColorTrigger, ColorTriggerOpts, TriggerSink};
-use crate::engine::failsafe::is_at_corner;
+use crate::engine::failsafe::{is_at_corner, within};
 use crate::engine::hotkeys::HotkeyManager;
 use crate::engine::player::{PlaybackSink, Player};
 use crate::engine::recorder::Recorder;
@@ -338,40 +338,55 @@ pub fn start_consumer(core: AppCore, app: AppHandle, rx: Receiver<RawInput>) {
     thread::Builder::new()
         .name("input-consumer".into())
         .spawn(move || {
+            // This thread owns the stop hotkeys (F8/F12) + corner failsafe. It
+            // must never die, or the user can get stuck under a running clicker.
+            // Contain any per-event panic so the kill switch stays alive (in
+            // release, panic=abort kills the process instead — also safe).
             for raw in rx.iter() {
-                // 1) Feed the recorder (cursor pos for button events).
-                if core.recorder.is_active() {
-                    let cursor = core.cursor.get();
-                    let codes = core.hotkeys.codes();
-                    if let Some(ev) = core.recorder.feed(&raw, cursor, &codes) {
-                        let _ = app.emit(
-                            names::RECORDING_EVENT_ADDED,
-                            RecordingEventAdded {
-                                count: core.recorder.count(),
-                                last_event: ev,
-                            },
-                        );
-                    }
-                }
-
-                // 2) Hotkeys — only on key press.
-                if let RawInput::Key {
-                    code,
-                    action: KeyAction::Press,
-                } = &raw
-                {
-                    if let Some(action) = core.hotkeys.match_action(code) {
-                        handle_hotkey(&core, &app, action);
-                    }
-                }
-
-                // 3) Corner failsafe — only on real user moves during playback.
-                if let RawInput::Move { x, y } = raw {
-                    maybe_corner_failsafe(&core, &app, x, y);
+                let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    process_event(&core, &app, &raw);
+                }));
+                if res.is_err() {
+                    eprintln!(
+                        "input-consumer: recovered from a panic; hotkeys/failsafe stay alive"
+                    );
                 }
             }
         })
         .expect("failed to spawn input-consumer thread");
+}
+
+fn process_event(core: &AppCore, app: &AppHandle, raw: &RawInput) {
+    // 1) Feed the recorder (cursor pos for button events).
+    if core.recorder.is_active() {
+        let cursor = core.cursor.get();
+        let codes = core.hotkeys.codes();
+        if let Some(ev) = core.recorder.feed(raw, cursor, &codes) {
+            let _ = app.emit(
+                names::RECORDING_EVENT_ADDED,
+                RecordingEventAdded {
+                    count: core.recorder.count(),
+                    last_event: ev,
+                },
+            );
+        }
+    }
+
+    // 2) Hotkeys — only on key press.
+    if let RawInput::Key {
+        code,
+        action: KeyAction::Press,
+    } = raw
+    {
+        if let Some(action) = core.hotkeys.match_action(code) {
+            handle_hotkey(core, app, action);
+        }
+    }
+
+    // 3) Corner failsafe — only on real user moves during playback.
+    if let RawInput::Move { x, y } = raw {
+        maybe_corner_failsafe(core, app, *x, *y);
+    }
 }
 
 fn handle_hotkey(core: &AppCore, app: &AppHandle, action: HotkeyAction) {
@@ -441,7 +456,8 @@ fn maybe_corner_failsafe(core: &AppCore, app: &AppHandle, x: i32, y: i32) {
     let (sx, sy) = core.player.last_synth();
     let (tx, ty) = core.color_trigger.last_synth();
     let (ax2, ay2) = core.autoclicker.last_synth();
-    let near_synth = |ax: i32, ay: i32| (x - ax).abs() <= 2 && (y - ay).abs() <= 2;
+    // Overflow-safe (last_synth defaults to i32::MIN before anything synthesizes).
+    let near_synth = |ax: i32, ay: i32| within(ax, ay, x, y, 2);
     if near_synth(sx, sy) || near_synth(tx, ty) || near_synth(ax2, ay2) {
         return;
     }

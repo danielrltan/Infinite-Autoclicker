@@ -30,6 +30,13 @@ impl CancelToken {
     }
 }
 
+/// True if (ax,ay) and (bx,by) are within `threshold` px on both axes.
+/// Overflow-safe (i64): the synthesized-position sentinel is `i32::MIN`, and
+/// `x - i32::MIN` would overflow.
+pub fn within(ax: i32, ay: i32, bx: i32, by: i32, threshold: i64) -> bool {
+    (ax as i64 - bx as i64).abs() <= threshold && (ay as i64 - by as i64).abs() <= threshold
+}
+
 /// True if (x, y) is within `threshold` px of any monitor corner. Used to detect
 /// a real user slamming the cursor into a corner during playback.
 pub fn is_at_corner(x: i32, y: i32, monitors: &[Monitor], threshold: u32) -> bool {
@@ -88,5 +95,16 @@ mod tests {
     #[test]
     fn center_does_not_trigger() {
         assert!(!is_at_corner(960, 540, &mon(), 5));
+    }
+
+    #[test]
+    fn within_is_overflow_safe_with_min_sentinel() {
+        // The synthesized-position sentinel is i32::MIN; comparing a real cursor
+        // position against it must not overflow (this once killed the consumer
+        // thread and trapped the user under a running clicker).
+        assert!(!within(i32::MIN, i32::MIN, 500, 500, 2));
+        assert!(!within(500, 500, i32::MIN, i32::MIN, 2));
+        assert!(within(500, 500, 501, 499, 2));
+        assert!(!within(500, 500, 510, 500, 2));
     }
 }
