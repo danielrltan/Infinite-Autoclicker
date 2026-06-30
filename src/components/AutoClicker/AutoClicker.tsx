@@ -72,14 +72,9 @@ export function AutoClicker() {
               <TimeField unit="ms" value={ms} onChange={(v) => { setMs(v); writeInterval(h, m, s, v); }} wide />
             </div>
           </div>
-          <div className="text-right">
-            <div className="tabular text-3xl font-semibold leading-none text-text">
-              {autoclick.interval_ms.toLocaleString()}
-              <span className="ml-1 text-base font-normal text-muted">ms</span>
-            </div>
-            <p className="mt-1 text-body text-muted">
-              {autoclick.interval_ms === 0 ? "as fast as possible" : "between clicks"}
-            </p>
+          <div className="tabular text-3xl font-semibold leading-none text-text">
+            {autoclick.interval_ms.toLocaleString()}
+            <span className="ml-1 text-base font-normal text-muted">ms</span>
           </div>
         </div>
       </Card>

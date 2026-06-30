@@ -203,7 +203,7 @@ function StepEditor({ step }: { step: Step }) {
       )}
 
       {step.action === "key" && (
-        <Field label="Key" hint="Taps the key (press + release).">
+        <Field label="Key">
           <CaptureButton value={step.keyCode} onCapture={(keyCode) => set({ keyCode })} className="w-full" />
         </Field>
       )}
@@ -236,11 +236,11 @@ function RecordField({ step }: { step: Step }) {
           {step.events.length > 0 ? "Re-record" : "Record actions"}
         </Button>
       )}
-      <p className="text-body text-muted">
-        {step.events.length > 0
-          ? `${step.events.length} events recorded — replayed inline at this point.`
-          : "Records your live input and replays it as part of this macro."}
-      </p>
+      {step.events.length > 0 && (
+        <p className="tabular text-body text-muted">
+          {step.events.length} events recorded
+        </p>
+      )}
     </div>
   );
 }

@@ -85,12 +85,6 @@ export function ColorTrigger() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <p className="px-1 text-body leading-relaxed text-muted">
-        Picks targets by <strong className="font-medium text-text">color</strong>,
-        not a static image — so it tracks popups that spin, shrink, or overlap.
-        Clicks the center of the largest matching blob on an interval.
-      </p>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.1fr_1fr] lg:items-start">
         <Section title="Match">
           <Field label="Target color">
@@ -153,10 +147,7 @@ export function ColorTrigger() {
               </Select>
             </Field>
           </div>
-          <FieldRow
-            label="Move cursor before clicking"
-            description="Glides to the target first; more human-like."
-          >
+          <FieldRow label="Move cursor before clicking">
             <Switch checked={moveBefore} onCheckedChange={setMoveBefore} />
           </FieldRow>
         </Section>
