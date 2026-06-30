@@ -34,6 +34,11 @@ pub fn run() {
             // Load persisted settings before constructing the core.
             let settings = commands::load_settings(&handle);
 
+            // Best-effort: drop trash entries older than 30 days at startup.
+            if let Ok(macros) = handle.path().app_data_dir().map(|d| d.join("macros")) {
+                let _ = crate::storage::auto_purge_trash(&macros, 30);
+            }
+
             // Global listener → single consumer (SPEC §4).
             let cursor = Arc::new(CursorTracker::new());
             let (tx, rx) = mpsc::channel();
@@ -69,9 +74,14 @@ pub fn run() {
             commands::stop_recording,
             commands::default_macro_dir,
             commands::save_macro,
+            commands::save_macro_by_name,
+            commands::macro_exists,
             commands::load_macro,
             commands::list_macros,
             commands::delete_macro,
+            commands::list_trash,
+            commands::restore_macro,
+            commands::purge_trash,
             commands::list_recent,
             commands::schedule_macro,
             commands::cancel_schedule,

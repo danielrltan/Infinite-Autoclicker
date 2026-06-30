@@ -16,6 +16,7 @@ use crate::model::{
     CursorPos, FailsafeConfig, HotkeyConfig, Macro, MacroMeta, Monitor, PermissionStatus,
     PlaybackOpts, RecordOpts, Schedule, ScheduleInfo, SessionType, Settings, Source,
 };
+use crate::storage::TrashEntry;
 
 const SETTINGS_FILE: &str = "settings.json";
 const RECENT_KEY: &str = "recent";
@@ -128,10 +129,34 @@ pub fn default_macro_dir(app: AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn save_macro(app: AppHandle, path: String, mac: Macro) -> Result<(), String> {
-    crate::storage::save_macro(&path, &mac).map_err(|e| e.to_string())?;
-    push_recent(&app, &path);
+pub fn save_macro(app: AppHandle, path: String, mac: Macro, overwrite: bool) -> Result<(), String> {
+    let dest =
+        crate::storage::save_macro_guarded(&path, &mac, overwrite).map_err(|e| e.to_string())?;
+    push_recent(&app, &dest.to_string_lossy());
     Ok(())
+}
+
+/// Build the canonical path under the macros dir in Rust (the frontend passes a
+/// bare name, never a concatenated path — fixes the mixed-separator save bug).
+#[tauri::command]
+pub fn save_macro_by_name(
+    app: AppHandle,
+    name: String,
+    mac: Macro,
+    overwrite: bool,
+) -> Result<String, String> {
+    let dir = macro_dir(&app)?;
+    let dest = crate::storage::canonical_macro_path(&dir, &name);
+    let written = crate::storage::save_macro_guarded(&dest.to_string_lossy(), &mac, overwrite)
+        .map_err(|e| e.to_string())?;
+    let s = written.to_string_lossy().into_owned();
+    push_recent(&app, &s);
+    Ok(s)
+}
+
+#[tauri::command]
+pub fn macro_exists(path: String) -> bool {
+    crate::storage::macro_exists(&path)
 }
 
 #[tauri::command]
@@ -146,11 +171,33 @@ pub fn list_macros(app: AppHandle) -> Result<Vec<MacroMeta>, String> {
     Ok(crate::storage::list_macros_in_dir(&macro_dir(&app)?))
 }
 
+/// Soft delete: moves the macro into `<macros_dir>/.trash/` and returns the
+/// trash entry so the UI can offer Undo. Recoverable until purged.
 #[tauri::command]
-pub fn delete_macro(app: AppHandle, path: String) -> Result<(), String> {
-    crate::storage::delete_macro(&path).map_err(|e| e.to_string())?;
+pub fn delete_macro(app: AppHandle, path: String) -> Result<TrashEntry, String> {
+    let entry = crate::storage::soft_delete_macro(&path).map_err(|e| e.to_string())?;
     remove_recent(&app, &path);
-    Ok(())
+    Ok(entry)
+}
+
+#[tauri::command]
+pub fn list_trash(app: AppHandle) -> Result<Vec<TrashEntry>, String> {
+    Ok(crate::storage::list_trash(&macro_dir(&app)?))
+}
+
+/// Restore by token; returns the final path (differs if the original was taken).
+#[tauri::command]
+pub fn restore_macro(app: AppHandle, token: String) -> Result<String, String> {
+    let dest =
+        crate::storage::restore_trash(&macro_dir(&app)?, &token).map_err(|e| e.to_string())?;
+    let s = dest.to_string_lossy().into_owned();
+    push_recent(&app, &s);
+    Ok(s)
+}
+
+#[tauri::command]
+pub fn purge_trash(app: AppHandle, token: String) -> Result<(), String> {
+    crate::storage::purge_trash(&macro_dir(&app)?, &token).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

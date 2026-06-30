@@ -8,7 +8,9 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { ipc, subscribe } from "@/lib/ipc";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   compileSteps,
   newClickStep,
@@ -32,10 +34,26 @@ import type {
 } from "@/lib/types";
 
 export type Tab = "steps" | "recorded" | "color" | "schedule";
+export interface ToastAction {
+  label: string;
+  onClick: () => void | Promise<void>;
+}
 export interface Toast {
   id: number;
   msg: string;
   kind: "info" | "success" | "error" | "warn";
+  action?: ToastAction;
+  durationMs?: number;
+}
+export interface ToastOptions {
+  action?: ToastAction;
+  durationMs?: number;
+}
+export interface ConfirmOptions {
+  title: string;
+  description?: ReactNode;
+  confirmLabel?: string;
+  destructive?: boolean;
 }
 
 interface AppContextValue {
@@ -72,6 +90,8 @@ interface AppContextValue {
   recording: { active: boolean; count: number; elapsedMs: number };
   progress: { loop: number; event: number; totalEvents: number; totalLoops: number | null } | null;
   colorClicks: number | null;
+  // editor dirty state
+  dirty: boolean;
   // library / schedules
   library: MacroMeta[];
   recent: MacroMeta[];
@@ -91,8 +111,9 @@ interface AppContextValue {
   stop: () => Promise<void>;
   toggleRecord: () => Promise<void>;
   // files
-  newMacro: () => void;
+  newMacro: () => Promise<void>;
   saveCurrent: () => Promise<void>;
+  saveAs: (name: string) => Promise<void>;
   loadFromLibrary: (m: MacroMeta) => Promise<void>;
   deleteFromLibrary: (m: MacroMeta) => Promise<void>;
   refreshLibrary: () => Promise<void>;
@@ -105,7 +126,9 @@ interface AppContextValue {
   // settings
   saveSettings: (s: Settings) => Promise<void>;
   // misc
-  toast: (msg: string, kind?: Toast["kind"]) => void;
+  toast: (msg: string, kind?: Toast["kind"], opts?: ToastOptions) => void;
+  dismissToast: (id: number) => void;
+  confirm: (opts: ConfirmOptions) => Promise<boolean>;
 }
 
 const Ctx = createContext<AppContextValue | null>(null);
@@ -152,21 +175,81 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [recent, setRecent] = useState<MacroMeta[]>([]);
   const [schedules, setSchedules] = useState<ScheduleInfo[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [currentPath, setCurrentPath] = useState<string | null>(null);
+  const [, setCurrentPath] = useState<string | null>(null);
+
+  // Dirty tracking (ref mirror so the window-close listener reads the latest).
+  const [dirty, setDirtyState] = useState(false);
+  const dirtyRef = useRef(false);
+  const setDirty = useCallback((v: boolean) => {
+    dirtyRef.current = v;
+    setDirtyState(v);
+  }, []);
+  const savedName = useRef<string | null>(null);
+  const lastTrash = useRef<{ token: string; name: string; at: number } | null>(null);
 
   const recStart = useRef(0);
   const toastId = useRef(0);
+
+  // Imperative confirm dialog (one host rendered in the provider).
+  const [confirmState, setConfirmState] = useState<{
+    open: boolean;
+    title: string;
+    description?: ReactNode;
+    confirmLabel: string;
+    destructive: boolean;
+    resolve?: (ok: boolean) => void;
+  }>({ open: false, title: "", confirmLabel: "Confirm", destructive: false });
 
   const events = useMemo(
     () => (source === "recorded" ? recordedEvents : compileSteps(steps)),
     [source, recordedEvents, steps],
   );
 
-  const toast = useCallback((msg: string, kind: Toast["kind"] = "info") => {
-    const id = ++toastId.current;
-    setToasts((t) => [...t, { id, msg, kind }]);
-    setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
+  const dismissToast = useCallback((id: number) => {
+    setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
+
+  // Component-owned dismissal (Toasts.tsx) so the undo window can pause on hover.
+  const toast = useCallback(
+    (msg: string, kind: Toast["kind"] = "info", opts?: ToastOptions) => {
+      const id = ++toastId.current;
+      setToasts((t) => [
+        ...t,
+        { id, msg, kind, action: opts?.action, durationMs: opts?.durationMs },
+      ]);
+    },
+    [],
+  );
+
+  const confirm = useCallback((opts: ConfirmOptions) => {
+    return new Promise<boolean>((resolve) => {
+      setConfirmState({
+        open: true,
+        title: opts.title,
+        description: opts.description,
+        confirmLabel: opts.confirmLabel ?? "Confirm",
+        destructive: opts.destructive ?? false,
+        resolve,
+      });
+    });
+  }, []);
+
+  const resolveConfirm = useCallback((ok: boolean) => {
+    setConfirmState((s) => {
+      s.resolve?.(ok);
+      return { ...s, open: false, resolve: undefined };
+    });
+  }, []);
+
+  const confirmDiscardIfDirty = useCallback(async (): Promise<boolean> => {
+    if (!dirtyRef.current) return true;
+    return confirm({
+      title: "Discard unsaved changes?",
+      description: "Your current macro has changes that haven't been saved.",
+      confirmLabel: "Discard",
+      destructive: true,
+    });
+  }, [confirm]);
 
   // ── Theme controller (system/light/dark) ─────────────────────────
   useEffect(() => {
@@ -232,6 +315,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setRecordedEvents(p.macro.events);
           setSource("recorded");
           setTab("recorded");
+          setDirty(true); // a fresh recording is unsaved
         },
         onPlaybackProgress: (p) =>
           setProgress({
@@ -261,56 +345,108 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("focus", onFocus);
   }, []);
 
+  // ── Dirty-aware run-opt / name setters ───────────────────────────
+  const setMacroNameDirty = useCallback(
+    (s: string) => {
+      setMacroName(s);
+      setDirty(true);
+    },
+    [setDirty],
+  );
+  const setRepeatDirty = useCallback(
+    (n: number) => {
+      setRepeat(n);
+      setDirty(true);
+    },
+    [setDirty],
+  );
+  const setSpeedDirty = useCallback(
+    (n: number) => {
+      setSpeed(n);
+      setDirty(true);
+    },
+    [setDirty],
+  );
+  const setJitterDirty = useCallback(
+    (j: JitterConfig) => {
+      setJitter(j);
+      setDirty(true);
+    },
+    [setDirty],
+  );
+
   // ── Step actions ─────────────────────────────────────────────────
   const addClickStep = useCallback(() => {
     const s = newClickStep();
     setSteps((prev) => [...prev, s]);
     setSelectedStepId(s.id);
     setSource("built");
-  }, []);
+    setDirty(true);
+  }, [setDirty]);
   const addDragStep = useCallback(() => {
     const s = newDragStep();
     setSteps((prev) => [...prev, s]);
     setSelectedStepId(s.id);
     setSource("built");
-  }, []);
-  const updateStep = useCallback((id: string, patch: Partial<Step>) => {
-    setSteps((prev) =>
-      prev.map((s) => (s.id === id ? ({ ...s, ...patch } as Step) : s)),
-    );
-  }, []);
-  const deleteStep = useCallback((id: string) => {
-    setSteps((prev) => prev.filter((s) => s.id !== id));
-  }, []);
-  const duplicateStep = useCallback((id: string) => {
-    setSteps((prev) => {
-      const i = prev.findIndex((s) => s.id === id);
-      const orig = prev[i];
-      if (i < 0 || !orig) return prev;
-      const copy = { ...orig, id: `${orig.kind}-${Date.now()}` } as Step;
-      const next = [...prev];
-      next.splice(i + 1, 0, copy);
-      return next;
-    });
-  }, []);
-  const moveStep = useCallback((id: string, dir: -1 | 1) => {
-    setSteps((prev) => {
-      const i = prev.findIndex((s) => s.id === id);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= prev.length) return prev;
-      const a = prev[i];
-      const b = prev[j];
-      if (!a || !b) return prev;
-      const next = [...prev];
-      next[i] = b;
-      next[j] = a;
-      return next;
-    });
-  }, []);
+    setDirty(true);
+  }, [setDirty]);
+  const updateStep = useCallback(
+    (id: string, patch: Partial<Step>) => {
+      setSteps((prev) =>
+        prev.map((s) => (s.id === id ? ({ ...s, ...patch } as Step) : s)),
+      );
+      setDirty(true);
+    },
+    [setDirty],
+  );
+  const deleteStep = useCallback(
+    (id: string) => {
+      setSteps((prev) => prev.filter((s) => s.id !== id));
+      setDirty(true);
+    },
+    [setDirty],
+  );
+  const duplicateStep = useCallback(
+    (id: string) => {
+      setSteps((prev) => {
+        const i = prev.findIndex((s) => s.id === id);
+        const orig = prev[i];
+        if (i < 0 || !orig) return prev;
+        const copy = { ...orig, id: `${orig.kind}-${Date.now()}` } as Step;
+        const next = [...prev];
+        next.splice(i + 1, 0, copy);
+        return next;
+      });
+      setDirty(true);
+    },
+    [setDirty],
+  );
+  const moveStep = useCallback(
+    (id: string, dir: -1 | 1) => {
+      setSteps((prev) => {
+        const i = prev.findIndex((s) => s.id === id);
+        const j = i + dir;
+        if (i < 0 || j < 0 || j >= prev.length) return prev;
+        const a = prev[i];
+        const b = prev[j];
+        if (!a || !b) return prev;
+        const next = [...prev];
+        next[i] = b;
+        next[j] = a;
+        return next;
+      });
+      setDirty(true);
+    },
+    [setDirty],
+  );
 
-  const deleteRecordedEvent = useCallback((index: number) => {
-    setRecordedEvents((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  const deleteRecordedEvent = useCallback(
+    (index: number) => {
+      setRecordedEvents((prev) => prev.filter((_, i) => i !== index));
+      setDirty(true);
+    },
+    [setDirty],
+  );
 
   const captureCursorInto = useCallback(
     async (field: "click" | "dragFrom" | "dragTo") => {
@@ -389,63 +525,152 @@ export function AppProvider({ children }: { children: ReactNode }) {
   };
 
   // ── Files ────────────────────────────────────────────────────────
-  const newMacro = useCallback(() => {
+  const newMacro = useCallback(async () => {
+    if (!(await confirmDiscardIfDirty())) return;
     setSteps([]);
     setRecordedEvents([]);
     setSource("built");
     setMacroName("Untitled macro");
     setCurrentPath(null);
+    savedName.current = null;
+    setDirty(false);
     setTab("steps");
-  }, []);
+  }, [confirmDiscardIfDirty, setDirty]);
+
+  // Save by name; the path is built in Rust (no fragile string concat). On a
+  // name collision the prior version goes to Trash (restorable) after confirm.
+  const persist = useCallback(
+    async (name: string): Promise<boolean> => {
+      const evs = source === "recorded" ? recordedEvents : compileSteps(steps);
+      if (evs.length === 0) {
+        toast("Nothing to save — add a step or record first", "warn");
+        return false;
+      }
+      const macro: Macro = { ...buildMacro(evs), name };
+      const ownsName = savedName.current === name; // re-saving the same macro: no prompt
+      try {
+        const path = await ipc.saveMacroByName(name, macro, ownsName);
+        setCurrentPath(path);
+        savedName.current = name;
+        setMacroName(name);
+        setDirty(false);
+        toast(`Saved ${name}`, "success");
+        await refreshLibrary();
+        return true;
+      } catch (e) {
+        if (!errMessage(e).startsWith("EXISTS:")) {
+          toast(`Save failed: ${errMessage(e)}`, "error");
+          return false;
+        }
+        const ok = await confirm({
+          title: `Replace ${name}?`,
+          description:
+            "A macro with this name already exists. The current version moves to Trash and can be restored.",
+          confirmLabel: "Replace",
+          destructive: true,
+        });
+        if (!ok) return false;
+        try {
+          const path = await ipc.saveMacroByName(name, macro, true);
+          setCurrentPath(path);
+          savedName.current = name;
+          setMacroName(name);
+          setDirty(false);
+          toast(`Replaced ${name}`, "success");
+          await refreshLibrary();
+          return true;
+        } catch (e2) {
+          toast(`Save failed: ${errMessage(e2)}`, "error");
+          return false;
+        }
+      }
+    },
+    [source, recordedEvents, steps, buildMacro, confirm, refreshLibrary, toast, setDirty],
+  );
 
   const saveCurrent = useCallback(async () => {
-    try {
-      const dir = await ipc.defaultMacroDir();
-      const safe = macroName.replace(/[^\w.-]+/g, "_") || "macro";
-      const path = currentPath ?? `${dir}/${safe}.json`;
-      const evs = source === "recorded" ? recordedEvents : compileSteps(steps);
-      await ipc.saveMacro(path, buildMacro(evs));
-      setCurrentPath(path);
-      toast("Saved", "success");
-      await refreshLibrary();
-    } catch (e) {
-      toast(`Save failed: ${e}`, "error");
-    }
-  }, [macroName, currentPath, source, recordedEvents, steps, buildMacro, refreshLibrary, toast]);
+    await persist((macroName || "").trim() || "Untitled macro");
+  }, [macroName, persist]);
+
+  const saveAs = useCallback(
+    async (name: string) => {
+      const clean = name.trim();
+      if (!clean) {
+        toast("Enter a name first", "warn");
+        return;
+      }
+      savedName.current = null; // force the collision check for the new name
+      await persist(clean);
+    },
+    [persist, toast],
+  );
 
   const loadFromLibrary = useCallback(
     async (m: MacroMeta) => {
+      if (!(await confirmDiscardIfDirty())) return;
       try {
         const macro = await ipc.loadMacro(m.path);
         setMacroName(macro.name);
-        setSource(macro.source);
+        setSource("recorded");
         setRepeat(macro.settings.repeat);
         setSpeed(macro.settings.speed);
         setCurrentPath(m.path);
-        if (macro.source === "recorded") {
-          setRecordedEvents(macro.events);
-          setTab("recorded");
-        } else {
-          // Loaded built macros come back as a compiled timeline; show as events.
-          setRecordedEvents(macro.events);
-          setSource("recorded");
-          setTab("recorded");
-        }
+        savedName.current = macro.name; // re-saving won't prompt
+        // Built and recorded macros both arrive as a compiled timeline.
+        setRecordedEvents(macro.events);
+        setTab("recorded");
+        setDirty(false);
         toast(`Loaded ${macro.name}`, "success");
       } catch (e) {
-        toast(`Load failed: ${e}`, "error");
+        toast(`Load failed: ${errMessage(e)}`, "error");
       }
     },
-    [toast],
+    [confirmDiscardIfDirty, toast, setDirty],
+  );
+
+  const restoreFromTrash = useCallback(
+    async (token: string, name: string) => {
+      try {
+        const path = await ipc.restoreMacro(token);
+        await refreshLibrary();
+        const landed = path.replace(/^.*[\\/]/, "").replace(/\.json$/, "");
+        if (landed && landed !== name) {
+          toast(`Restored as ${landed} (original name was taken)`, "success");
+        } else {
+          toast(`Restored ${name}`, "success");
+        }
+      } catch (e) {
+        toast(`Restore failed: ${errMessage(e)}`, "error");
+      }
+    },
+    [refreshLibrary, toast],
   );
 
   const deleteFromLibrary = useCallback(
     async (m: MacroMeta) => {
-      await ipc.deleteMacro(m.path);
-      toast("Deleted", "success");
-      await refreshLibrary();
+      const ok = await confirm({
+        title: `Delete ${m.name}?`,
+        description: "It moves to Trash and can be restored.",
+        confirmLabel: "Delete",
+        destructive: true,
+      });
+      if (!ok) return;
+      try {
+        const entry = await ipc.deleteMacro(m.path);
+        lastTrash.current = { token: entry.token, name: m.name, at: Date.now() };
+        await refreshLibrary();
+        toast(`Deleted ${m.name}`, "success", {
+          durationMs: 8000,
+          action: {
+            label: "Undo",
+            onClick: () => restoreFromTrash(entry.token, m.name),
+          },
+        });
+      } catch (e) {
+        toast(`Delete failed: ${errMessage(e)}`, "error");
+      }
     },
-    [refreshLibrary, toast],
+    [confirm, refreshLibrary, toast, restoreFromTrash],
   );
 
   // ── Schedules ────────────────────────────────────────────────────
@@ -499,6 +724,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (progress && progress.totalEvents === 0) setColorClicks(progress.loop);
   }, [progress]);
 
+  // Ctrl/Cmd+Z restores the most recent soft-delete within its grace window.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+      const lt = lastTrash.current;
+      if (lt && Date.now() - lt.at < 8000) {
+        e.preventDefault();
+        lastTrash.current = null;
+        void restoreFromTrash(lt.token, lt.name);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [restoreFromTrash]);
+
+  // Guard the window's close button against losing unsaved changes.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    (async () => {
+      try {
+        const win = getCurrentWindow();
+        unlisten = await win.onCloseRequested(async (e) => {
+          if (!dirtyRef.current) return;
+          e.preventDefault();
+          const discard = await confirm({
+            title: "Discard unsaved changes?",
+            description: "Your macro has changes that haven't been saved. Save first to keep them.",
+            confirmLabel: "Discard and close",
+            destructive: true,
+          });
+          if (discard) await win.destroy();
+        });
+      } catch {
+        // Non-Tauri / unavailable window API: skip the guard.
+      }
+    })();
+    return () => unlisten?.();
+  }, [confirm]);
+
   // ── Settings ─────────────────────────────────────────────────────
   const saveSettings = useCallback(
     async (s: Settings) => {
@@ -517,7 +781,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     tab,
     setTab,
     macroName,
-    setMacroName,
+    setMacroName: setMacroNameDirty,
     source,
     steps,
     recordedEvents,
@@ -526,11 +790,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     selectedStepId,
     setSelectedStepId,
     repeat,
-    setRepeat,
+    setRepeat: setRepeatDirty,
     speed,
-    setSpeed,
+    setSpeed: setSpeedDirty,
     jitter,
-    setJitter,
+    setJitter: setJitterDirty,
     recordMode,
     setRecordMode,
     captureKeyboard,
@@ -538,6 +802,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     recording,
     progress,
     colorClicks,
+    dirty,
     library,
     recent,
     schedules,
@@ -554,6 +819,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toggleRecord,
     newMacro,
     saveCurrent,
+    saveAs,
     loadFromLibrary,
     deleteFromLibrary,
     refreshLibrary,
@@ -563,9 +829,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     stopColorTrigger,
     saveSettings,
     toast,
+    dismissToast,
+    confirm,
   };
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider value={value}>
+      {children}
+      <ConfirmDialog
+        open={confirmState.open}
+        title={confirmState.title}
+        description={confirmState.description}
+        confirmLabel={confirmState.confirmLabel}
+        destructive={confirmState.destructive}
+        onConfirm={() => resolveConfirm(true)}
+        onCancel={() => resolveConfirm(false)}
+      />
+    </Ctx.Provider>
+  );
+}
+
+function errMessage(e: unknown): string {
+  if (typeof e === "string") return e;
+  if (e && typeof e === "object" && "message" in e)
+    return String((e as { message: unknown }).message);
+  return String(e);
 }
 
 function defaultSettings(): Settings {

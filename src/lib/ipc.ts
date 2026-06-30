@@ -24,6 +24,7 @@ import type {
   RecordingStopped,
   Rgb,
   Schedule,
+  TrashEntry,
   ScheduleInfo,
   SessionType,
   Settings,
@@ -48,12 +49,19 @@ export const ipc = {
     invoke<void>("start_recording", { opts }),
   stopRecording: () => invoke<Macro>("stop_recording"),
 
-  saveMacro: (path: string, macro: Macro) =>
-    invoke<void>("save_macro", { path, mac: macro }),
+  saveMacro: (path: string, macro: Macro, overwrite: boolean) =>
+    invoke<void>("save_macro", { path, mac: macro, overwrite }),
+  saveMacroByName: (name: string, macro: Macro, overwrite: boolean) =>
+    invoke<string>("save_macro_by_name", { name, mac: macro, overwrite }),
+  macroExists: (path: string) => invoke<boolean>("macro_exists", { path }),
   loadMacro: (path: string) => invoke<Macro>("load_macro", { path }),
   listMacros: () => invoke<MacroMeta[]>("list_macros"),
   listRecent: () => invoke<MacroMeta[]>("list_recent"),
-  deleteMacro: (path: string) => invoke<void>("delete_macro", { path }),
+  // Soft delete → returns the trash entry so the UI can offer Undo.
+  deleteMacro: (path: string) => invoke<TrashEntry>("delete_macro", { path }),
+  listTrash: () => invoke<TrashEntry[]>("list_trash"),
+  restoreMacro: (token: string) => invoke<string>("restore_macro", { token }),
+  purgeTrash: (token: string) => invoke<void>("purge_trash", { token }),
   defaultMacroDir: () => invoke<string>("default_macro_dir"),
 
   scheduleMacro: (macro: Macro, schedule: Schedule) =>

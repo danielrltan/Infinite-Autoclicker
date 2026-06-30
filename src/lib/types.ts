@@ -68,6 +68,15 @@ export interface MacroMeta {
   created: string;
 }
 
+/** A soft-deleted macro in the trash (recoverable). Mirrors Rust TrashEntry. */
+export interface TrashEntry {
+  token: string;
+  original_name: string;
+  original_path: string;
+  trashed_at: string;
+  event_count: number;
+}
+
 // ── Playback / recording options ───────────────────────────────────
 
 export interface PlaybackOpts {
