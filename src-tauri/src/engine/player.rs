@@ -326,6 +326,11 @@ fn execute_event(
             move_to(tx, ty);
             let _ = backend.button(*button, KeyAction::Release);
         }
+        EventKind::Scroll { x, y, dx, dy } => {
+            let (px, py) = pos(*x, *y);
+            move_to(px, py);
+            let _ = backend.scroll(*dx, *dy);
+        }
         EventKind::Key { code, action } => {
             let _ = backend.key(code, *action);
         }

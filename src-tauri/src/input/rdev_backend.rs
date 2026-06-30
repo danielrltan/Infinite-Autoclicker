@@ -56,6 +56,13 @@ impl InputBackend for RdevBackend {
         }
     }
 
+    fn scroll(&self, dx: i32, dy: i32) -> Result<()> {
+        send(&EventType::Wheel {
+            delta_x: dx as i64,
+            delta_y: dy as i64,
+        })
+    }
+
     fn name(&self) -> &'static str {
         "rdev"
     }

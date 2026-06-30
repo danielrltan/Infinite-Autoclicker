@@ -65,6 +65,13 @@ pub enum EventKind {
         code: String,
         action: KeyAction,
     },
+    /// Mouse wheel scroll at a point. `dy` > 0 scrolls up, `dx` > 0 scrolls right.
+    Scroll {
+        x: i32,
+        y: i32,
+        dx: i32,
+        dy: i32,
+    },
     /// Explicit pause (built macros).
     Wait {
         ms: u64,

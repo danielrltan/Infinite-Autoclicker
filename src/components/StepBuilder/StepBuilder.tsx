@@ -1,4 +1,14 @@
-import { Crosshair, Copy, Trash2, ChevronUp, ChevronDown, Plus } from "lucide-react";
+import { useState } from "react";
+import {
+  Crosshair,
+  Copy,
+  Trash2,
+  ChevronUp,
+  ChevronDown,
+  Plus,
+  Circle,
+  Square,
+} from "lucide-react";
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,16 +21,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { browserCodeToIac } from "@/lib/keymap";
+import { ACTION_LABELS, type Step, type StepAction } from "@/lib/compile";
 import { cn } from "@/lib/utils";
-import type { ClickStep, DragStep, Step } from "@/lib/compile";
 
 export function StepBuilder() {
   const {
     steps,
     selectedStepId,
     setSelectedStepId,
-    addClickStep,
-    addDragStep,
+    addStep,
     deleteStep,
     duplicateStep,
     moveStep,
@@ -29,20 +39,15 @@ export function StepBuilder() {
   const selected = steps.find((s) => s.id === selectedStepId) ?? null;
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_340px]">
       <div className="space-y-2">
-        <div className="flex gap-2">
-          <Button size="sm" variant="secondary" onClick={addClickStep}>
-            <Plus className="h-4 w-4" /> Click step
-          </Button>
-          <Button size="sm" variant="secondary" onClick={addDragStep}>
-            <Plus className="h-4 w-4" /> Drag step
-          </Button>
-        </div>
+        <Button size="sm" onClick={() => addStep("click")}>
+          <Plus className="h-4 w-4" /> Add step
+        </Button>
 
         {steps.length === 0 ? (
           <p className="rounded-card border border-dashed border-border p-6 text-center text-sm text-muted">
-            No steps yet. Add a click to build a sequence.
+            No steps yet. Add a step, then choose its action and coordinate.
           </p>
         ) : (
           <ul className="space-y-1">
@@ -85,11 +90,7 @@ export function StepBuilder() {
 
       <div className="rounded-card border border-border bg-surface p-3">
         {selected ? (
-          selected.kind === "click" ? (
-            <ClickEditor step={selected} />
-          ) : (
-            <DragEditor step={selected} />
-          )
+          <StepEditor step={selected} />
         ) : (
           <p className="text-sm text-muted">Select a step to edit it.</p>
         )}
@@ -98,127 +99,225 @@ export function StepBuilder() {
   );
 }
 
-function ClickEditor({ step }: { step: ClickStep }) {
+function StepEditor({ step }: { step: Step }) {
   const { updateStep, captureCursorInto } = useApp();
-  const set = (p: Partial<ClickStep>) => updateStep(step.id, p as Partial<Step>);
+  const set = (p: Partial<Step>) => updateStep(step.id, p);
+
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-semibold">Click step</h3>
-      <div className="grid grid-cols-2 gap-2">
-        <NumField label="X" value={step.x} onChange={(x) => set({ x })} />
-        <NumField label="Y" value={step.y} onChange={(y) => set({ y })} />
-      </div>
-      <Button size="sm" variant="outline" onClick={() => captureCursorInto("click")}>
-        <Crosshair className="h-4 w-4" /> Capture cursor (F6)
-      </Button>
       <div className="space-y-1">
-        <Label>Click type</Label>
+        <Label>Action</Label>
         <Select
-          value={step.clickType}
-          onValueChange={(v) => set({ clickType: v as ClickStep["clickType"] })}
+          value={step.action}
+          onValueChange={(v) => set({ action: v as StepAction })}
         >
           <SelectTrigger>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="left">Left</SelectItem>
-            <SelectItem value="right">Right</SelectItem>
-            <SelectItem value="middle">Middle</SelectItem>
-            <SelectItem value="double">Double (left)</SelectItem>
+            {(Object.keys(ACTION_LABELS) as StepAction[]).map((a) => (
+              <SelectItem key={a} value={a}>
+                {ACTION_LABELS[a]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
-      {step.clickType !== "double" && (
-        <NumField
-          label="Click count"
-          value={step.count}
-          min={1}
-          onChange={(count) => set({ count })}
-        />
+
+      {step.action === "click" && (
+        <>
+          <Coord
+            xLabel="X"
+            yLabel="Y"
+            x={step.x}
+            y={step.y}
+            onX={(x) => set({ x })}
+            onY={(y) => set({ y })}
+            onCapture={() => captureCursorInto("click")}
+          />
+          <div className="space-y-1">
+            <Label>Click type</Label>
+            <Select value={step.clickType} onValueChange={(v) => set({ clickType: v as Step["clickType"] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">Left click</SelectItem>
+                <SelectItem value="right">Right click</SelectItem>
+                <SelectItem value="middle">Middle click</SelectItem>
+                <SelectItem value="double">Double click</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {step.clickType !== "double" && (
+            <NumField label="Click count" value={step.count} min={1} onChange={(count) => set({ count })} />
+          )}
+          <label className="flex items-center justify-between">
+            <Label>Return cursor after click</Label>
+            <Switch checked={step.returnCursor} onCheckedChange={(returnCursor) => set({ returnCursor })} />
+          </label>
+        </>
       )}
-      <div className="grid grid-cols-2 gap-2">
-        <NumField
-          label="Delay before (s)"
-          value={step.delayBefore}
-          step={0.1}
-          min={0}
-          onChange={(delayBefore) => set({ delayBefore })}
-        />
-        <NumField
-          label="Delay jitter (s)"
-          value={step.delayJitter}
-          step={0.1}
-          min={0}
-          onChange={(delayJitter) => set({ delayJitter })}
-        />
+
+      {step.action === "drag" && (
+        <>
+          <Coord
+            xLabel="From X"
+            yLabel="From Y"
+            x={step.fromX}
+            y={step.fromY}
+            onX={(fromX) => set({ fromX })}
+            onY={(fromY) => set({ fromY })}
+            onCapture={() => captureCursorInto("dragFrom")}
+            captureLabel="Capture start"
+          />
+          <Coord
+            xLabel="To X"
+            yLabel="To Y"
+            x={step.toX}
+            y={step.toY}
+            onX={(toX) => set({ toX })}
+            onY={(toY) => set({ toY })}
+            onCapture={() => captureCursorInto("dragTo")}
+            captureLabel="Capture end"
+          />
+          <div className="space-y-1">
+            <Label>Button</Label>
+            <Select value={step.button} onValueChange={(v) => set({ button: v as Step["button"] })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="left">Left</SelectItem>
+                <SelectItem value="right">Right</SelectItem>
+                <SelectItem value="middle">Middle</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <NumField label="Move duration (ms)" value={step.durationMs} min={0} step={50} onChange={(durationMs) => set({ durationMs })} />
+        </>
+      )}
+
+      {step.action === "scroll" && (
+        <>
+          <Coord
+            xLabel="X"
+            yLabel="Y"
+            x={step.x}
+            y={step.y}
+            onX={(x) => set({ x })}
+            onY={(y) => set({ y })}
+            onCapture={() => captureCursorInto("click")}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label>Direction</Label>
+              <Select value={step.scrollDir} onValueChange={(v) => set({ scrollDir: v as Step["scrollDir"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="up">Up</SelectItem>
+                  <SelectItem value="down">Down</SelectItem>
+                  <SelectItem value="left">Left</SelectItem>
+                  <SelectItem value="right">Right</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <NumField label="Amount (notches)" value={step.scrollAmount} min={1} onChange={(scrollAmount) => set({ scrollAmount })} />
+          </div>
+        </>
+      )}
+
+      {step.action === "key" && <KeyField step={step} set={set} />}
+
+      {step.action === "wait" && (
+        <NumField label="Wait (ms)" value={step.waitMs} min={0} step={50} onChange={(waitMs) => set({ waitMs })} />
+      )}
+
+      {step.action === "record" && <RecordField step={step} />}
+
+      {/* Common delay fields (all actions) */}
+      <div className="grid grid-cols-2 gap-2 border-t border-border pt-3">
+        <NumField label="Delay before (s)" value={step.delayBefore} step={0.1} min={0} onChange={(delayBefore) => set({ delayBefore })} />
+        <NumField label="Delay jitter (s)" value={step.delayJitter} step={0.1} min={0} onChange={(delayJitter) => set({ delayJitter })} />
       </div>
-      <label className="flex items-center justify-between">
-        <Label>Return cursor after click</Label>
-        <Switch
-          checked={step.returnCursor}
-          onCheckedChange={(returnCursor) => set({ returnCursor })}
-        />
-      </label>
     </div>
   );
 }
 
-function DragEditor({ step }: { step: DragStep }) {
-  const { updateStep, captureCursorInto } = useApp();
-  const set = (p: Partial<DragStep>) => updateStep(step.id, p as Partial<Step>);
+function KeyField({ step, set }: { step: Step; set: (p: Partial<Step>) => void }) {
+  const [listening, setListening] = useState(false);
   return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-semibold">Drag step</h3>
+    <div className="space-y-1">
+      <Label>Key</Label>
+      <button
+        onClick={() => setListening(true)}
+        onBlur={() => setListening(false)}
+        onKeyDown={(e) => {
+          if (!listening) return;
+          e.preventDefault();
+          const code = browserCodeToIac(e.nativeEvent);
+          if (code) {
+            set({ keyCode: code });
+            setListening(false);
+          }
+        }}
+        className={`tabular h-9 w-full rounded-control border px-3 text-sm ${listening ? "border-accent text-accent" : "border-border"}`}
+      >
+        {listening ? "Press a key…" : step.keyCode}
+      </button>
+      <p className="text-xs text-muted">Taps the key (press + release).</p>
+    </div>
+  );
+}
+
+function RecordField({ step }: { step: Step }) {
+  const { recordIntoStep, recording } = useApp();
+  const isRecordingThis = recording.active;
+  return (
+    <div className="space-y-2">
+      {isRecordingThis ? (
+        <Button size="sm" variant="record" onClick={() => recordIntoStep(step.id)}>
+          <Square className="h-4 w-4 fill-current" /> Stop recording ({recording.count})
+        </Button>
+      ) : (
+        <Button size="sm" variant="secondary" onClick={() => recordIntoStep(step.id)}>
+          <Circle className="h-4 w-4 fill-record text-record" />
+          {step.events.length > 0 ? "Re-record" : "Record actions"}
+        </Button>
+      )}
+      <p className="text-xs text-muted">
+        {step.events.length > 0
+          ? `${step.events.length} events recorded — replayed inline at this point.`
+          : "Records your live input and replays it as part of this macro."}
+      </p>
+    </div>
+  );
+}
+
+function Coord({
+  xLabel,
+  yLabel,
+  x,
+  y,
+  onX,
+  onY,
+  onCapture,
+  captureLabel = "Capture cursor (F6)",
+}: {
+  xLabel: string;
+  yLabel: string;
+  x: number;
+  y: number;
+  onX: (n: number) => void;
+  onY: (n: number) => void;
+  onCapture: () => void;
+  captureLabel?: string;
+}) {
+  return (
+    <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
-        <NumField label="From X" value={step.fromX} onChange={(fromX) => set({ fromX })} />
-        <NumField label="From Y" value={step.fromY} onChange={(fromY) => set({ fromY })} />
+        <NumField label={xLabel} value={x} onChange={onX} />
+        <NumField label={yLabel} value={y} onChange={onY} />
       </div>
-      <Button size="sm" variant="outline" onClick={() => captureCursorInto("dragFrom")}>
-        <Crosshair className="h-4 w-4" /> Capture start
+      <Button size="sm" variant="outline" onClick={onCapture}>
+        <Crosshair className="h-4 w-4" /> {captureLabel}
       </Button>
-      <div className="grid grid-cols-2 gap-2">
-        <NumField label="To X" value={step.toX} onChange={(toX) => set({ toX })} />
-        <NumField label="To Y" value={step.toY} onChange={(toY) => set({ toY })} />
-      </div>
-      <Button size="sm" variant="outline" onClick={() => captureCursorInto("dragTo")}>
-        <Crosshair className="h-4 w-4" /> Capture end
-      </Button>
-      <div className="space-y-1">
-        <Label>Button</Label>
-        <Select value={step.button} onValueChange={(v) => set({ button: v as DragStep["button"] })}>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="left">Left</SelectItem>
-            <SelectItem value="right">Right</SelectItem>
-            <SelectItem value="middle">Middle</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      <NumField
-        label="Move duration (ms)"
-        value={step.durationMs}
-        min={0}
-        step={50}
-        onChange={(durationMs) => set({ durationMs })}
-      />
-      <div className="grid grid-cols-2 gap-2">
-        <NumField
-          label="Delay before (s)"
-          value={step.delayBefore}
-          step={0.1}
-          min={0}
-          onChange={(delayBefore) => set({ delayBefore })}
-        />
-        <NumField
-          label="Delay jitter (s)"
-          value={step.delayJitter}
-          step={0.1}
-          min={0}
-          onChange={(delayJitter) => set({ delayJitter })}
-        />
-      </div>
     </div>
   );
 }
@@ -276,11 +375,22 @@ function IconBtn({
 }
 
 function stepSummary(s: Step): string {
-  if (s.kind === "click") {
-    const type = s.clickType === "double" ? "Double-click" : `${cap(s.clickType)} click`;
-    return `${type} at ${s.x}, ${s.y} · ${s.delayBefore}s${s.count > 1 && s.clickType !== "double" ? ` ×${s.count}` : ""}`;
+  switch (s.action) {
+    case "click": {
+      const type = s.clickType === "double" ? "Double-click" : `${cap(s.clickType)} click`;
+      return `${type} at ${s.x}, ${s.y}`;
+    }
+    case "drag":
+      return `Drag ${s.fromX},${s.fromY} → ${s.toX},${s.toY}`;
+    case "scroll":
+      return `Scroll ${s.scrollDir} ×${s.scrollAmount} at ${s.x}, ${s.y}`;
+    case "key":
+      return `Press ${s.keyCode}`;
+    case "wait":
+      return `Wait ${s.waitMs} ms`;
+    case "record":
+      return `Recorded action (${s.events.length} events)`;
   }
-  return `Drag ${s.fromX},${s.fromY} → ${s.toX},${s.toY} · ${s.durationMs}ms`;
 }
 
 function cap(s: string) {

@@ -5,7 +5,7 @@
 use std::sync::Mutex;
 
 use enigo::{
-    Button as EButton, Coordinate, Direction, Enigo, Key as EKey, Keyboard, Mouse, Settings,
+    Axis, Button as EButton, Coordinate, Direction, Enigo, Key as EKey, Keyboard, Mouse, Settings,
 };
 
 use super::backend::{InputBackend, InputError, Result};
@@ -132,6 +132,22 @@ impl InputBackend for EnigoBackend {
         enigo
             .key(key, map_dir(action))
             .map_err(|e| InputError::Simulate(format!("{e:?}")))
+    }
+
+    fn scroll(&self, dx: i32, dy: i32) -> Result<()> {
+        let mut enigo = self.inner.lock().unwrap();
+        // enigo positive length scrolls down/right; our dy>0 means up.
+        if dy != 0 {
+            enigo
+                .scroll(-dy, Axis::Vertical)
+                .map_err(|e| InputError::Simulate(format!("{e:?}")))?;
+        }
+        if dx != 0 {
+            enigo
+                .scroll(dx, Axis::Horizontal)
+                .map_err(|e| InputError::Simulate(format!("{e:?}")))?;
+        }
+        Ok(())
     }
 
     fn name(&self) -> &'static str {

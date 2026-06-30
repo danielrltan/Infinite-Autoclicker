@@ -153,6 +153,19 @@ function Mark({
       <circle cx={x} cy={yOf(y)} r={1} fill="var(--muted)" />
     );
   }
+  if (e.kind === "scroll") {
+    return (
+      <circle
+        cx={x}
+        cy={20}
+        r={3}
+        fill="none"
+        stroke="var(--play)"
+        strokeWidth={1.5}
+        vectorEffect="non-scaling-stroke"
+      />
+    );
+  }
   // down / up / click ticks
   const color =
     e.kind === "click" ? "var(--accent)" : "var(--text)";
@@ -170,7 +183,13 @@ function Mark({
 }
 
 function eventY(e: MacroEvent): number | null {
-  if (e.kind === "move" || e.kind === "down" || e.kind === "up" || e.kind === "click")
+  if (
+    e.kind === "move" ||
+    e.kind === "down" ||
+    e.kind === "up" ||
+    e.kind === "click" ||
+    e.kind === "scroll"
+  )
     return e.y;
   if (e.kind === "drag") return e.from[1];
   return null;

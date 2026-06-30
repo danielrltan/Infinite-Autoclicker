@@ -13,9 +13,9 @@ import { ipc, subscribe } from "@/lib/ipc";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   compileSteps,
-  newClickStep,
-  newDragStep,
+  newStep,
   type Step,
+  type StepAction,
 } from "@/lib/compile";
 import type {
   AppState,
@@ -103,12 +103,13 @@ interface AppContextValue {
   schedules: ScheduleInfo[];
   toasts: Toast[];
   // step actions
-  addClickStep: () => void;
-  addDragStep: () => void;
+  addStep: (action?: StepAction) => void;
   updateStep: (id: string, patch: Partial<Step>) => void;
   deleteStep: (id: string) => void;
   duplicateStep: (id: string) => void;
   moveStep: (id: string, dir: -1 | 1) => void;
+  recordIntoStep: (stepId: string) => Promise<void>;
+  clearRecording: () => Promise<void>;
   // capture
   captureCursorInto: (field: "click" | "dragFrom" | "dragTo") => Promise<void>;
   // playback / record
@@ -204,6 +205,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const recStart = useRef(0);
   const toastId = useRef(0);
+  // When set, the next recording is captured into this step (inline record).
+  const recordingStepRef = useRef<string | null>(null);
 
   // Imperative confirm dialog (one host rendered in the provider).
   const [confirmState, setConfirmState] = useState<{
@@ -327,6 +330,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         onRecordingEventAdded: (p) =>
           setRecording((r) => ({ ...r, count: p.count })),
         onRecordingStopped: (p) => {
+          const stepId = recordingStepRef.current;
+          if (stepId) {
+            // Inline record-into-step: store the snippet on that step.
+            recordingStepRef.current = null;
+            setSteps((prev) =>
+              prev.map((s) =>
+                s.id === stepId
+                  ? ({ ...s, action: "record", events: p.macro.events } as Step)
+                  : s,
+              ),
+            );
+            setDirty(true);
+            return;
+          }
           setRecordedEvents(p.macro.events);
           setSource("recorded");
           setTab("recorded");
@@ -391,20 +408,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 
   // ── Step actions ─────────────────────────────────────────────────
-  const addClickStep = useCallback(() => {
-    const s = newClickStep();
-    setSteps((prev) => [...prev, s]);
-    setSelectedStepId(s.id);
-    setSource("built");
-    setDirty(true);
-  }, [setDirty]);
-  const addDragStep = useCallback(() => {
-    const s = newDragStep();
-    setSteps((prev) => [...prev, s]);
-    setSelectedStepId(s.id);
-    setSource("built");
-    setDirty(true);
-  }, [setDirty]);
+  const addStep = useCallback(
+    (action: StepAction = "click") => {
+      const s = newStep(action);
+      setSteps((prev) => [...prev, s]);
+      setSelectedStepId(s.id);
+      setSource("built");
+      setDirty(true);
+    },
+    [setDirty],
+  );
   const updateStep = useCallback(
     (id: string, patch: Partial<Step>) => {
       setSteps((prev) =>
@@ -427,7 +440,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const i = prev.findIndex((s) => s.id === id);
         const orig = prev[i];
         if (i < 0 || !orig) return prev;
-        const copy = { ...orig, id: `${orig.kind}-${Date.now()}` } as Step;
+        const copy = { ...orig, id: `${orig.action}-${Date.now()}` } as Step;
         const next = [...prev];
         next.splice(i + 1, 0, copy);
         return next;
@@ -462,6 +475,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [setDirty],
   );
+
+  // Record a live snippet directly into a step (toggle: start, then stop).
+  const recordIntoStep = useCallback(
+    async (stepId: string) => {
+      if (recording.active) {
+        await ipc.stopRecording();
+        setRecording({ active: false, count: 0, elapsedMs: 0 });
+        return;
+      }
+      recordingStepRef.current = stepId;
+      await ipc.startRecording({
+        capture_mode: recordMode,
+        motion_sample_ms: 15,
+        capture_keyboard: captureKeyboard,
+      });
+      recStart.current = Date.now();
+      setRecording({ active: true, count: 0, elapsedMs: 0 });
+    },
+    [recording.active, recordMode, captureKeyboard],
+  );
+
+  const clearRecording = useCallback(async () => {
+    if (recordedEvents.length === 0) return;
+    const ok = await confirm({
+      title: "Clear recording?",
+      description: "Removes all recorded events from the editor. Saved macros are untouched.",
+      confirmLabel: "Clear",
+      destructive: true,
+    });
+    if (!ok) return;
+    setRecordedEvents([]);
+    setDirty(true);
+  }, [recordedEvents.length, confirm, setDirty]);
 
   const captureCursorInto = useCallback(
     async (field: "click" | "dragFrom" | "dragTo") => {
@@ -835,12 +881,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     recent,
     schedules,
     toasts,
-    addClickStep,
-    addDragStep,
+    addStep,
     updateStep,
     deleteStep,
     duplicateStep,
     moveStep,
+    recordIntoStep,
+    clearRecording,
     captureCursorInto,
     play,
     stop,

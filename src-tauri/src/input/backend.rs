@@ -24,6 +24,11 @@ pub trait InputBackend: Send + Sync {
     fn button(&self, button: MouseButton, action: KeyAction) -> Result<()>;
     /// Press or release a key by platform-neutral code (e.g. "KeyE", "Return").
     fn key(&self, code: &str, action: KeyAction) -> Result<()>;
+    /// Scroll the mouse wheel. `dy` > 0 scrolls up, `dx` > 0 scrolls right.
+    /// Default is a no-op so test doubles need not implement it.
+    fn scroll(&self, _dx: i32, _dy: i32) -> Result<()> {
+        Ok(())
+    }
     /// Backend name for diagnostics ("rdev" | "enigo").
     fn name(&self) -> &'static str;
 }

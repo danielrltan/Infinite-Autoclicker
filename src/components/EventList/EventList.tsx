@@ -1,10 +1,12 @@
-import { Trash2 } from "lucide-react";
+import { Trash2, Eraser } from "lucide-react";
 import { useApp } from "@/store";
+import { Button } from "@/components/ui/button";
 import { fmtMs } from "@/lib/utils";
 import type { MacroEvent } from "@/lib/types";
 
 export function EventList() {
-  const { recordedEvents, deleteRecordedEvent, progress, status } = useApp();
+  const { recordedEvents, deleteRecordedEvent, clearRecording, progress, status } =
+    useApp();
 
   if (recordedEvents.length === 0) {
     return (
@@ -18,7 +20,16 @@ export function EventList() {
     status === "playing" && progress ? progress.event : -1;
 
   return (
-    <div className="max-h-[40vh] overflow-auto rounded-card border border-border">
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted">
+          <span className="tabular">{recordedEvents.length}</span> recorded events
+        </span>
+        <Button size="sm" variant="ghost" onClick={clearRecording}>
+          <Eraser className="h-4 w-4" /> Clear recording
+        </Button>
+      </div>
+      <div className="max-h-[40vh] overflow-auto rounded-card border border-border">
       <table className="w-full text-sm">
         <thead className="sticky top-0 bg-surface text-xs text-muted">
           <tr>
@@ -53,8 +64,9 @@ export function EventList() {
               </td>
             </tr>
           ))}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -73,6 +85,8 @@ function eventLabel(e: MacroEvent): string {
       return `Drag ${e.from[0]},${e.from[1]} → ${e.to[0]},${e.to[1]} (${e.duration_ms}ms)`;
     case "key":
       return `Key ${e.code} ${e.action}`;
+    case "scroll":
+      return `Scroll ${e.dy > 0 ? "up" : e.dy < 0 ? "down" : e.dx > 0 ? "right" : "left"} @ ${e.x}, ${e.y}`;
     case "wait":
       return `Wait ${e.ms}ms`;
   }

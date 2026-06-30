@@ -20,6 +20,7 @@ export type EventKind =
       duration_ms: number;
     }
   | { kind: "key"; code: string; action: KeyAction }
+  | { kind: "scroll"; x: number; y: number; dx: number; dy: number }
   | { kind: "wait"; ms: number };
 
 /** `t` = milliseconds from macro start (monotonically non-decreasing). */

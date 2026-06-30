@@ -1,47 +1,59 @@
-// Step Builder model + compiler. Steps *generate* a timeline (SPEC §6, §F1).
-// One playback engine, one file format: built and recorded macros are both just
-// `MacroEvent[]`.
+// Step Builder model + compiler. One "Add step", then pick the action per step.
+// Steps *generate* a timeline (SPEC §6, §F1); built and recorded macros share
+// the same `MacroEvent[]` format and one playback engine.
 
 import type { MacroEvent, MouseButton } from "./types";
 
 export type ClickType = "left" | "right" | "middle" | "double";
+export type ScrollDir = "up" | "down" | "left" | "right";
+export type StepAction = "click" | "drag" | "scroll" | "key" | "wait" | "record";
 
-export interface ClickStep {
+/** A single, flat step. `action` selects which fields are used + shown. */
+export interface Step {
   id: string;
-  kind: "click";
+  action: StepAction;
+  /** seconds before this step runs */
+  delayBefore: number;
+  /** seconds; adds uniform(0, jitter) to the delay when rolled at play time */
+  delayJitter: number;
+
+  // click
   x: number;
   y: number;
   clickType: ClickType;
   count: number;
-  /** seconds */
-  delayBefore: number;
-  /** seconds; adds uniform(0, jitter) to the delay when rolled at play time */
-  delayJitter: number;
   returnCursor: boolean;
-}
 
-export interface DragStep {
-  id: string;
-  kind: "drag";
+  // drag
   fromX: number;
   fromY: number;
   toX: number;
   toY: number;
   button: MouseButton;
-  /** how long the press-hold-move takes (ms) */
   durationMs: number;
-  delayBefore: number;
-  delayJitter: number;
+
+  // scroll
+  scrollDir: ScrollDir;
+  scrollAmount: number;
+
+  // key
+  keyCode: string;
+
+  // wait
+  waitMs: number;
+
+  // record (inline-recorded snippet)
+  events: MacroEvent[];
 }
 
-export type Step = ClickStep | DragStep;
-
-export interface CompileOpts {
-  /** Cursor home position; used to honor "return cursor after click". */
-  home?: { x: number; y: number };
-  /** Roll per-step delay jitter (true at play time, false for deterministic display/save). */
-  rollJitter?: boolean;
-}
+export const ACTION_LABELS: Record<StepAction, string> = {
+  click: "Click",
+  drag: "Drag",
+  scroll: "Scroll",
+  key: "Key press",
+  wait: "Wait",
+  record: "Recorded action",
+};
 
 let idCounter = 0;
 export function newId(prefix = "step"): string {
@@ -49,36 +61,60 @@ export function newId(prefix = "step"): string {
   return `${prefix}-${idCounter}-${Math.floor(Math.random() * 1e6)}`;
 }
 
-export function newClickStep(x = 0, y = 0): ClickStep {
+export function newStep(action: StepAction = "click", x = 0, y = 0): Step {
   return {
     id: newId(),
-    kind: "click",
+    action,
+    delayBefore: 1,
+    delayJitter: 0,
     x,
     y,
     clickType: "left",
     count: 1,
-    delayBefore: 1,
-    delayJitter: 0,
     returnCursor: false,
-  };
-}
-
-export function newDragStep(): DragStep {
-  return {
-    id: newId(),
-    kind: "drag",
-    fromX: 0,
-    fromY: 0,
-    toX: 0,
-    toY: 0,
+    fromX: x,
+    fromY: y,
+    toX: x,
+    toY: y,
     button: "left",
     durationMs: 400,
-    delayBefore: 1,
-    delayJitter: 0,
+    scrollDir: "down",
+    scrollAmount: 3,
+    keyCode: "Space",
+    waitMs: 1000,
+    events: [],
   };
 }
 
-/** Compile an ordered list of steps into a timeline of events. */
+function scrollDelta(dir: ScrollDir, amount: number): { dx: number; dy: number } {
+  switch (dir) {
+    case "up":
+      return { dx: 0, dy: amount };
+    case "down":
+      return { dx: 0, dy: -amount };
+    case "right":
+      return { dx: amount, dy: 0 };
+    case "left":
+      return { dx: -amount, dy: 0 };
+  }
+}
+
+function snippetDuration(events: MacroEvent[]): number {
+  let max = 0;
+  for (const e of events) {
+    let end = e.t;
+    if (e.kind === "drag") end += e.duration_ms;
+    if (end > max) max = end;
+  }
+  return max;
+}
+
+export interface CompileOpts {
+  home?: { x: number; y: number };
+  rollJitter?: boolean;
+}
+
+/** Compile ordered steps into a timeline of events. */
 export function compileSteps(steps: Step[], opts: CompileOpts = {}): MacroEvent[] {
   const out: MacroEvent[] = [];
   let t = 0;
@@ -86,25 +122,50 @@ export function compileSteps(steps: Step[], opts: CompileOpts = {}): MacroEvent[
     const jitter = opts.rollJitter ? Math.random() * step.delayJitter : 0;
     t += Math.round((step.delayBefore + jitter) * 1000);
 
-    if (step.kind === "click") {
-      const button: MouseButton =
-        step.clickType === "double" ? "left" : step.clickType;
-      const count = step.clickType === "double" ? 2 : Math.max(1, step.count);
-      out.push({ t, kind: "click", button, x: step.x, y: step.y, count });
-      if (step.returnCursor && opts.home) {
-        out.push({ t, kind: "move", x: opts.home.x, y: opts.home.y });
+    switch (step.action) {
+      case "click": {
+        const button: MouseButton =
+          step.clickType === "double" ? "left" : step.clickType;
+        const count = step.clickType === "double" ? 2 : Math.max(1, step.count);
+        out.push({ t, kind: "click", button, x: step.x, y: step.y, count });
+        if (step.returnCursor && opts.home) {
+          out.push({ t, kind: "move", x: opts.home.x, y: opts.home.y });
+        }
+        break;
       }
-    } else {
-      out.push({
-        t,
-        kind: "drag",
-        button: step.button,
-        from: [step.fromX, step.fromY],
-        to: [step.toX, step.toY],
-        duration_ms: step.durationMs,
-      });
-      // Advance virtual clock past the drag so the next step's delay is additive.
-      t += step.durationMs;
+      case "drag": {
+        out.push({
+          t,
+          kind: "drag",
+          button: step.button,
+          from: [step.fromX, step.fromY],
+          to: [step.toX, step.toY],
+          duration_ms: step.durationMs,
+        });
+        t += step.durationMs;
+        break;
+      }
+      case "scroll": {
+        const { dx, dy } = scrollDelta(step.scrollDir, step.scrollAmount);
+        out.push({ t, kind: "scroll", x: step.x, y: step.y, dx, dy });
+        break;
+      }
+      case "key": {
+        out.push({ t, kind: "key", code: step.keyCode, action: "press" });
+        out.push({ t, kind: "key", code: step.keyCode, action: "release" });
+        break;
+      }
+      case "wait": {
+        t += step.waitMs;
+        break;
+      }
+      case "record": {
+        for (const ev of step.events) {
+          out.push({ ...ev, t: t + ev.t });
+        }
+        t += snippetDuration(step.events);
+        break;
+      }
     }
   }
   return out;
@@ -112,12 +173,11 @@ export function compileSteps(steps: Step[], opts: CompileOpts = {}): MacroEvent[
 
 /** Total compiled duration in ms (for the timeline scale). */
 export function timelineDuration(events: MacroEvent[]): number {
-  if (events.length === 0) return 0;
   let max = 0;
   for (const e of events) {
     let end = e.t;
     if (e.kind === "drag") end += e.duration_ms;
-    if (max < end) max = end;
+    if (end > max) max = end;
   }
   return max;
 }

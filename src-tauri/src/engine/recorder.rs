@@ -116,7 +116,12 @@ impl Recorder {
                     action: *action,
                 }
             }
-            RawInput::Wheel { .. } => return None, // wheel not in v1 timeline
+            RawInput::Wheel { dx, dy } => EventKind::Scroll {
+                x: cursor.0,
+                y: cursor.1,
+                dx: *dx as i32,
+                dy: *dy as i32,
+            },
         };
 
         let ev = Event { t, kind };
