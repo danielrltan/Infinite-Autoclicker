@@ -179,8 +179,8 @@ export interface AutoClickOpts {
   key_code: string | null;
 }
 
-/** What F8 (play/stop) starts when nothing is running. Pushed to the backend so
- *  the hotkey works even when the window is minimized. Mirrors Rust PlayIntent. */
+/** What the play/stop hotkey starts when nothing is running. Pushed to the
+ *  backend so it works even when the window is minimized. Mirrors Rust PlayIntent. */
 export type PlayIntent =
   | { kind: "none" }
   | { kind: "macro"; mac: Macro; opts: PlaybackOpts }

@@ -109,8 +109,9 @@ export function StepBuilder() {
 }
 
 function StepEditor({ step }: { step: Step }) {
-  const { updateStep, captureCursorInto } = useApp();
+  const { updateStep, captureCursorInto, settings } = useApp();
   const set = (p: Partial<Step>) => updateStep(step.id, p);
+  const captureLabel = `Capture cursor (${settings.hotkeys.capture_cursor})`;
 
   return (
     <div className="space-y-4">
@@ -142,6 +143,7 @@ function StepEditor({ step }: { step: Step }) {
             onX={(x) => set({ x })}
             onY={(y) => set({ y })}
             onCapture={() => captureCursorInto("click")}
+            captureLabel={captureLabel}
           />
           <Field label="Click type">
             <Select value={step.clickType} onValueChange={(v) => set({ clickType: v as Step["clickType"] })}>
@@ -184,7 +186,7 @@ function StepEditor({ step }: { step: Step }) {
 
       {step.action === "scroll" && (
         <>
-          <Coord xLabel="X" yLabel="Y" x={step.x} y={step.y} onX={(x) => set({ x })} onY={(y) => set({ y })} onCapture={() => captureCursorInto("click")} />
+          <Coord xLabel="X" yLabel="Y" x={step.x} y={step.y} onX={(x) => set({ x })} onY={(y) => set({ y })} onCapture={() => captureCursorInto("click")} captureLabel={captureLabel} />
           <div className="grid grid-cols-2 gap-2">
             <Field label="Direction">
               <Select value={step.scrollDir} onValueChange={(v) => set({ scrollDir: v as Step["scrollDir"] })}>
@@ -253,7 +255,7 @@ function Coord({
   onX,
   onY,
   onCapture,
-  captureLabel = "Capture cursor (F6)",
+  captureLabel = "Capture cursor",
 }: {
   xLabel: string;
   yLabel: string;

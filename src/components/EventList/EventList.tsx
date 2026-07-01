@@ -7,14 +7,20 @@ import { fmtMs } from "@/lib/utils";
 import type { MacroEvent } from "@/lib/types";
 
 export function EventList() {
-  const { recordedEvents, deleteRecordedEvent, clearRecording, progress, status } =
-    useApp();
+  const {
+    recordedEvents,
+    deleteRecordedEvent,
+    clearRecording,
+    progress,
+    status,
+    settings,
+  } = useApp();
 
   if (recordedEvents.length === 0) {
     return (
       <EmptyState
         title="No recorded events"
-        description="Press Record (F9) and perform some actions."
+        description={`Press Record (${settings.hotkeys.record_toggle}) and perform some actions.`}
       />
     );
   }

@@ -102,7 +102,7 @@ export const ipc = {
     invoke<void>("start_autoclick", { opts }),
   stopAutoclick: () => invoke<void>("stop_autoclick"),
 
-  // Background-hotkey intent caches (so F9/F8 work when minimized)
+  // Background-hotkey intent caches (so record/play hotkeys work when minimized)
   setRecordOpts: (opts: RecordOpts) => invoke<void>("set_record_opts", { opts }),
   setPlayIntent: (intent: PlayIntent) =>
     invoke<void>("set_play_intent", { intent }),

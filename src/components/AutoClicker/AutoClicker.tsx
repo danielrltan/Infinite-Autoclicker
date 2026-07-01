@@ -30,7 +30,7 @@ function splitMs(ms: number) {
 
 /** OP Auto Clicker's main window: interval, options, repeat, position, Start/Stop. */
 export function AutoClicker() {
-  const { autoclick, setAutoclick, startAutoclick, stop, status, colorClicks } =
+  const { autoclick, setAutoclick, startAutoclick, stop, status, colorClicks, settings } =
     useApp();
   const running = status === "playing" && colorClicks !== null;
   const init = splitMs(autoclick.interval_ms);
@@ -246,7 +246,9 @@ export function AutoClicker() {
               <MousePointerClick className="h-4 w-4" /> Start
             </>
           )}
-          <Kbd className="ml-1 border-white/20 bg-white/15 text-white/90">F8</Kbd>
+          <Kbd className="ml-1 border-white/20 bg-white/15 text-white/90">
+            {settings.hotkeys.play_stop_toggle}
+          </Kbd>
         </Button>
       </div>
     </div>

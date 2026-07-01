@@ -97,16 +97,18 @@ function RecorderControls() {
     setCaptureKeyboard,
     recording,
     toggleRecord,
+    settings,
   } = useApp();
+  const recKey = settings.hotkeys.record_toggle;
   return (
     <Card className="flex flex-wrap items-center gap-4 p-3">
       {recording.active ? (
         <Button variant="record" size="sm" onClick={toggleRecord}>
-          <Square className="h-4 w-4 fill-current" /> Stop (F9)
+          <Square className="h-4 w-4 fill-current" /> Stop ({recKey})
         </Button>
       ) : (
         <Button variant="secondary" size="sm" onClick={toggleRecord}>
-          <Circle className="h-4 w-4 fill-record text-record" /> Record (F9)
+          <Circle className="h-4 w-4 fill-record text-record" /> Record ({recKey})
         </Button>
       )}
       <div className="ml-auto flex items-center gap-4">

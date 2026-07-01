@@ -329,8 +329,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       unsub = await subscribe({
         onStatusChanged: (p) => {
           setStatus(p.state);
-          // Recording can be started from Rust (F9 while minimized), so the
-          // recording UI state follows the backend status, not the button.
+          // Recording can be started from Rust (record hotkey while minimized),
+          // so the recording UI state follows backend status, not the button.
           if (p.state === "recording") {
             setRecording((r) => {
               if (r.active) return r;
@@ -558,7 +558,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [autoclick]);
 
   const play = useCallback(async () => {
-    // On the Auto Clicker tab, Play/F8 starts the clicker.
+    // On the Auto Clicker tab, the play/stop hotkey starts the clicker.
     if (tab === "autoclick") {
       await startAutoclick();
       return;
@@ -604,8 +604,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (action === "capture") void captureCursorInto("click");
   };
 
-  // Keep the backend's record options + play intent fresh so F9/F8 act
-  // correctly even while the webview is suspended (minimized).
+  // Keep the backend's record options + play intent fresh so the record/play
+  // hotkeys act correctly even while the webview is suspended (minimized).
   useEffect(() => {
     ipc
       .setRecordOpts({
