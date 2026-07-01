@@ -2,11 +2,18 @@
 // Steps *generate* a timeline (SPEC §6, §F1); built and recorded macros share
 // the same `MacroEvent[]` format and one playback engine.
 
-import type { MacroEvent, MouseButton } from "./types";
+import type { MacroEvent, MouseButton, Rgb } from "./types";
 
 export type ClickType = "left" | "right" | "middle" | "double";
 export type ScrollDir = "up" | "down" | "left" | "right";
-export type StepAction = "click" | "drag" | "scroll" | "key" | "wait" | "record";
+export type StepAction =
+  | "click"
+  | "drag"
+  | "scroll"
+  | "key"
+  | "wait"
+  | "color"
+  | "record";
 
 /** A single, flat step. `action` selects which fields are used + shown. */
 export interface Step {
@@ -42,6 +49,13 @@ export interface Step {
   // wait
   waitMs: number;
 
+  // color (find-and-click a target color at play time)
+  matchColor: Rgb;
+  tolerance: number;
+  minBlob: number;
+  moveBefore: boolean;
+  colorTimeoutMs: number;
+
   // record (inline-recorded snippet)
   events: MacroEvent[];
 }
@@ -52,6 +66,7 @@ export const ACTION_LABELS: Record<StepAction, string> = {
   scroll: "Scroll",
   key: "Key press",
   wait: "Wait",
+  color: "Click color",
   record: "Recorded action",
 };
 
@@ -82,6 +97,11 @@ export function newStep(action: StepAction = "click", x = 0, y = 0): Step {
     scrollAmount: 3,
     keyCode: "Space",
     waitMs: 1000,
+    matchColor: { r: 255, g: 220, b: 0 },
+    tolerance: 60,
+    minBlob: 40,
+    moveBefore: true,
+    colorTimeoutMs: 0,
     events: [],
   };
 }
@@ -157,6 +177,26 @@ export function compileSteps(steps: Step[], opts: CompileOpts = {}): MacroEvent[
       }
       case "wait": {
         t += step.waitMs;
+        break;
+      }
+      case "color": {
+        const button: MouseButton =
+          step.clickType === "double" ? "left" : step.clickType;
+        const count = step.clickType === "double" ? 2 : Math.max(1, step.count);
+        out.push({
+          t,
+          kind: "findcolor",
+          match: {
+            target: step.matchColor,
+            tolerance: step.tolerance,
+            regions: [],
+            min_blob_px: step.minBlob,
+          },
+          button,
+          count,
+          move_before: step.moveBefore,
+          timeout_ms: Math.max(0, Math.round(step.colorTimeoutMs)),
+        });
         break;
       }
       case "record": {

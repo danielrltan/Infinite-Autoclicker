@@ -237,6 +237,19 @@ function Mark({
   if (e.kind === "move") {
     return y == null ? null : <circle cx={x} cy={yOf(y)} r={1} fill="var(--muted)" />;
   }
+  if (e.kind === "findcolor") {
+    return (
+      <circle
+        cx={x}
+        cy={VB_H / 2}
+        r={4}
+        fill="none"
+        stroke="var(--accent)"
+        strokeWidth={2}
+        vectorEffect="non-scaling-stroke"
+      />
+    );
+  }
   // down / up / click ticks
   const color = e.kind === "click" ? "var(--accent)" : "var(--text)";
   return (

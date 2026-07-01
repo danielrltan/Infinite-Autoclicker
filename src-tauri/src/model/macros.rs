@@ -2,6 +2,7 @@
 //! timestamped input events. Step Builder *generates* this; Recorder *captures*
 //! it; Player consumes it. See SPEC §6 and §9.
 
+use super::vision::ColorMatchConfig;
 use serde::{Deserialize, Serialize};
 
 pub const MACRO_VERSION: u32 = 1;
@@ -75,6 +76,20 @@ pub enum EventKind {
     /// Explicit pause (built macros).
     Wait {
         ms: u64,
+    },
+    /// Find the largest blob of a target color on screen and click it. The click
+    /// position is resolved at *playback time* from the live screen — so it tracks
+    /// targets that move between runs. Skips if not found within `timeout_ms`.
+    FindColor {
+        #[serde(rename = "match")]
+        match_cfg: ColorMatchConfig,
+        button: MouseButton,
+        /// Clicks to perform once found (1 = single, 2 = double).
+        count: u8,
+        /// Move the cursor onto the target before clicking.
+        move_before: bool,
+        /// Keep scanning up to this long for the color (0 = a single attempt).
+        timeout_ms: u32,
     },
 }
 
@@ -150,4 +165,39 @@ pub struct MacroMeta {
     pub source: Source,
     pub event_count: usize,
     pub created: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::vision::{ColorMatchConfig, Rgb};
+
+    #[test]
+    fn findcolor_event_serde_contract() {
+        let ev = Event {
+            t: 250,
+            kind: EventKind::FindColor {
+                match_cfg: ColorMatchConfig {
+                    target: Rgb {
+                        r: 255,
+                        g: 220,
+                        b: 0,
+                    },
+                    tolerance: 60,
+                    regions: vec![],
+                    min_blob_px: 40,
+                },
+                button: MouseButton::Left,
+                count: 1,
+                move_before: true,
+                timeout_ms: 0,
+            },
+        };
+        let json = serde_json::to_string(&ev).unwrap();
+        // Flattened, tagged on `kind`; the match config is under "match".
+        assert!(json.contains("\"kind\":\"findcolor\""), "{json}");
+        assert!(json.contains("\"match\":"), "{json}");
+        let back: Event = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, ev);
+    }
 }

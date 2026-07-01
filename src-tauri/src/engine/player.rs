@@ -25,6 +25,8 @@ pub trait PlaybackSink: Send + Sync {
 const SLEEP_CHUNK: Duration = Duration::from_millis(5);
 const PROGRESS_THROTTLE: Duration = Duration::from_millis(40);
 const DRAG_STEP_MS: u64 = 10;
+/// Gap between screen captures while a color step waits for its target.
+const COLOR_SCAN_INTERVAL: Duration = Duration::from_millis(80);
 
 /// Manages the single active playback. Stored in `AppCore`.
 pub struct Player {
@@ -337,6 +339,40 @@ fn execute_event(
         // Timing is driven by event `t`; Wait is a no-op marker (its pause is
         // encoded in the following event's timestamp).
         EventKind::Wait { .. } => {}
+        EventKind::FindColor {
+            match_cfg,
+            button,
+            count,
+            move_before,
+            timeout_ms,
+        } => {
+            // Resolve the click position from the live screen. Scan until found,
+            // the timeout elapses, or we're cancelled — checking cancel every
+            // capture so stop/panic/corner-slam still abort within ~one interval.
+            let deadline = Instant::now() + Duration::from_millis(*timeout_ms as u64);
+            loop {
+                if cancel.is_cancelled() {
+                    break;
+                }
+                if let Ok(Some(blob)) = super::screen::find_color_now(match_cfg) {
+                    if *move_before {
+                        move_to(blob.x, blob.y);
+                    }
+                    for _ in 0..(*count).max(1) {
+                        let _ = backend.button(*button, KeyAction::Press);
+                        let _ = backend.button(*button, KeyAction::Release);
+                    }
+                    break;
+                }
+                if *timeout_ms == 0 || Instant::now() >= deadline {
+                    break; // not found: skip this step
+                }
+                let next = (Instant::now() + COLOR_SCAN_INTERVAL).min(deadline);
+                if !sleep_until(next, cancel) {
+                    break;
+                }
+            }
+        }
     }
 }
 

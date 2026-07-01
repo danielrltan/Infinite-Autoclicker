@@ -100,6 +100,22 @@ test("adding a step works", async (driver) => {
   await waitText(driver, "Edit step");
 });
 
+test("color step can be added to the sequence", async (driver) => {
+  await clickButton(driver, "Sequence");
+  await clickButton(driver, "Add step");
+  await waitText(driver, "Edit step");
+  // Open the Action dropdown (first Radix combobox in the editor) → Click color.
+  const combos = await driver.findElements(By.css('button[role="combobox"]'));
+  await combos[0].click();
+  const opt = await driver.wait(
+    until.elementLocated(By.xpath("//*[@role='option'][contains(normalize-space(.), 'Click color')]")),
+    10000,
+  );
+  await opt.click();
+  // The color editor fields appear.
+  await waitText(driver, "Target color");
+});
+
 // ── run ────────────────────────────────────────────────────────────
 async function main() {
   preflight();

@@ -9,33 +9,10 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Rgb {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
-
-/// A screen-coordinate rectangle (physical px).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Rect {
-    pub x: i32,
-    pub y: i32,
-    pub w: i32,
-    pub h: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ColorMatchConfig {
-    pub target: Rgb,
-    /// Euclidean RGB distance threshold (0–441). ~30–80 works for vivid colors.
-    pub tolerance: u32,
-    /// Search regions in screen coords; empty scans the whole captured frame.
-    #[serde(default)]
-    pub regions: Vec<Rect>,
-    /// Ignore blobs smaller than this many matched pixels (noise filter).
-    pub min_blob_px: u32,
-}
+// Config types live in the domain model (they're part of the macro file format
+// now that a color step serializes one); re-exported here so existing
+// `engine::vision::{Rgb, Rect, ColorMatchConfig}` paths keep working.
+pub use crate::model::vision::{ColorMatchConfig, Rect, Rgb};
 
 /// A captured RGBA frame. `origin_*` place its top-left in global screen coords.
 pub struct Frame<'a> {

@@ -21,7 +21,15 @@ export type EventKind =
     }
   | { kind: "key"; code: string; action: KeyAction }
   | { kind: "scroll"; x: number; y: number; dx: number; dy: number }
-  | { kind: "wait"; ms: number };
+  | { kind: "wait"; ms: number }
+  | {
+      kind: "findcolor";
+      match: ColorMatchConfig;
+      button: MouseButton;
+      count: number;
+      move_before: boolean;
+      timeout_ms: number;
+    };
 
 /** `t` = milliseconds from macro start (monotonically non-decreasing). */
 export type MacroEvent = { t: number } & EventKind;

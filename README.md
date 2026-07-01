@@ -20,10 +20,12 @@ Screen capture used by the Color Trigger is processed locally and never transmit
 ## Features
 
 - **Sequence** — one page for building a sequence of operations. Add steps
-  (click, right/double click, drag, scroll, key press, wait) with position (manual
-  or captured by hotkey), count, delays, and delay jitter — or hit **Record** to
-  capture live input (clicks-only or full-motion with sampled movement, optional
-  keyboard) as a step in the same sequence. Per-macro repeat (0 = infinite).
+  (click, right/double click, drag, scroll, key press, wait, **click color**) with
+  position (manual or captured by hotkey), count, delays, and delay jitter — or hit
+  **Record** to capture live input (clicks-only or full-motion with sampled
+  movement, optional keyboard) as a step in the same sequence. The **click color**
+  step finds a target color on screen at playback time and clicks it, so a step can
+  track a target that moves between runs. Per-macro repeat (0 = infinite).
 - **Playback** — speed 0.25×–4×, repeat/infinite, accurate progress, instant stop.
 - **Humanization (jitter)** — optional position, timing, and move-path randomization
   for naturalness. See the anti-cheat note below.

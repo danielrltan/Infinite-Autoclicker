@@ -7,11 +7,14 @@ import {
   Plus,
   Circle,
   Square,
+  Pipette,
 } from "lucide-react";
 import { useApp } from "@/store";
+import { ipc } from "@/lib/ipc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import { Field } from "@/components/ui/field";
 import { IconButton } from "@/components/ui/icon-button";
 import { CaptureButton } from "@/components/ui/capture-button";
@@ -24,7 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ACTION_LABELS, type Step, type StepAction } from "@/lib/compile";
-import { cn } from "@/lib/utils";
+import { cn, rgbToHex } from "@/lib/utils";
 
 export function StepBuilder() {
   const {
@@ -109,9 +112,16 @@ export function StepBuilder() {
 }
 
 function StepEditor({ step }: { step: Step }) {
-  const { updateStep, captureCursorInto, settings } = useApp();
+  const { updateStep, captureCursorInto, settings, toast } = useApp();
   const set = (p: Partial<Step>) => updateStep(step.id, p);
   const captureLabel = `Capture cursor (${settings.hotkeys.capture_cursor})`;
+  const pickColor = async () => {
+    const rgb = await ipc.captureCursorColor().catch(() => null);
+    if (rgb) {
+      set({ matchColor: rgb });
+      toast(`Picked ${rgbToHex(rgb)}`, "success");
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -212,6 +222,59 @@ function StepEditor({ step }: { step: Step }) {
 
       {step.action === "wait" && (
         <NumField label="Wait (ms)" value={step.waitMs} min={0} step={50} onChange={(waitMs) => set({ waitMs })} />
+      )}
+
+      {step.action === "color" && (
+        <>
+          <Field label="Target color">
+            <div className="flex items-center gap-2">
+              <span
+                className="h-8 w-8 shrink-0 rounded-control border border-border"
+                style={{ background: rgbToHex(step.matchColor) }}
+              />
+              <span className="tabular flex-1 text-body text-muted">
+                {rgbToHex(step.matchColor)}
+              </span>
+              <Button size="sm" variant="outline" onClick={pickColor}>
+                <Pipette className="h-4 w-4" /> Pick
+              </Button>
+            </div>
+          </Field>
+          <Field label={`Tolerance · ${step.tolerance}`}>
+            <Slider
+              value={[step.tolerance]}
+              min={0}
+              max={200}
+              step={1}
+              onValueChange={(v) => set({ tolerance: v[0] ?? 0 })}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-2">
+            <NumField label="Min blob (px)" value={step.minBlob} min={1} onChange={(minBlob) => set({ minBlob })} />
+            <Field label="Click type">
+              <Select value={step.clickType} onValueChange={(v) => set({ clickType: v as Step["clickType"] })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="left">Left click</SelectItem>
+                  <SelectItem value="right">Right click</SelectItem>
+                  <SelectItem value="middle">Middle click</SelectItem>
+                  <SelectItem value="double">Double click</SelectItem>
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+          <NumField
+            label="Wait for color (ms, 0 = one try then skip)"
+            value={step.colorTimeoutMs}
+            min={0}
+            step={100}
+            onChange={(colorTimeoutMs) => set({ colorTimeoutMs })}
+          />
+          <label className="flex items-center justify-between">
+            <span className="text-label font-medium text-muted">Move to color before clicking</span>
+            <Switch checked={step.moveBefore} onCheckedChange={(moveBefore) => set({ moveBefore })} />
+          </label>
+        </>
       )}
 
       {step.action === "record" && <RecordField step={step} />}
@@ -320,6 +383,10 @@ function stepSummary(s: Step): string {
       return `Press ${s.keyCode}`;
     case "wait":
       return `Wait ${s.waitMs} ms`;
+    case "color": {
+      const type = s.clickType === "double" ? "Double-click" : `${cap(s.clickType)} click`;
+      return `${type} color ${rgbToHex(s.matchColor)}`;
+    }
     case "record":
       return `Recorded action (${s.events.length} events)`;
   }
