@@ -60,3 +60,39 @@ jobs:
       - name: Unit tests
         working-directory: src-tauri
         run: cargo test --lib
+
+  e2e:
+    name: E2E UI (Windows, tauri-driver)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+
+      - name: Build app binary (embeds frontend)
+        working-directory: src-tauri
+        run: cargo build
+
+      - name: Install tauri-driver
+        run: cargo install tauri-driver --locked
+
+      - name: Fetch matching Edge WebDriver
+        shell: pwsh
+        run: |
+          $edge = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Edge\BLBeacon' -ErrorAction SilentlyContinue).version
+          if (-not $edge) { $edge = (Get-Item 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe').VersionInfo.ProductVersion }
+          Write-Host "Edge version: $edge"
+          New-Item -ItemType Directory -Force .e2e | Out-Null
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$edge/edgedriver_win64.zip" -OutFile .e2e/edgedriver.zip
+          Expand-Archive .e2e/edgedriver.zip -DestinationPath .e2e -Force
+
+      - name: Run E2E
+        run: bun run test:e2e

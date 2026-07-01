@@ -76,6 +76,29 @@ bun run typecheck && bun run lint && bun run check:no-network
 cd src-tauri && cargo test && cargo clippy --all-targets -- -D warnings
 ```
 
+### End-to-end UI tests
+
+E2E tests drive the real app window via WebDriver (`tauri-driver` → Edge Driver →
+WebView2), so start/stop, recording, and navigation are tested for real. One-time
+setup:
+
+```bash
+cargo install tauri-driver --locked
+# Put an msedgedriver.exe matching your WebView2 version in .e2e/ (gitignored).
+# Find your version under "…\Microsoft\EdgeWebView\Application\" and download from
+# https://msedgedriver.microsoft.com/<version>/edgedriver_win64.zip
+```
+
+Then:
+
+```bash
+bun run build            # frontend
+cd src-tauri && cargo build && cd ..   # embeds the frontend into the exe
+bun run test:e2e         # launches the app and runs the UI scenarios
+```
+
+CI runs the same suite on Windows (see `.github/workflows/ci.yml`).
+
 ## File format
 
 Macros are versioned, human-readable JSON — one timeline of timestamped events.
