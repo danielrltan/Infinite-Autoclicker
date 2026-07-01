@@ -32,10 +32,9 @@ import type {
   ScheduleInfo,
   SessionType,
   Settings,
-  Source,
 } from "@/lib/types";
 
-export type Tab = "autoclick" | "steps" | "recorded" | "color" | "schedule";
+export type Tab = "autoclick" | "steps" | "color" | "schedule";
 export interface ToastAction {
   label: string;
   onClick: () => void | Promise<void>;
@@ -69,11 +68,8 @@ interface AppContextValue {
   setTab: (t: Tab) => void;
   macroName: string;
   setMacroName: (s: string) => void;
-  source: Source;
   steps: Step[];
-  recordedEvents: MacroEvent[];
-  deleteRecordedEvent: (index: number) => void;
-  events: MacroEvent[]; // derived current timeline
+  events: MacroEvent[]; // derived current timeline (compiled from steps)
   selectedStepId: string | null;
   setSelectedStepId: (id: string | null) => void;
   // run opts
@@ -110,7 +106,6 @@ interface AppContextValue {
   duplicateStep: (id: string) => void;
   moveStep: (id: string, dir: -1 | 1) => void;
   recordIntoStep: (stepId: string) => Promise<void>;
-  clearRecording: () => Promise<void>;
   // capture
   captureCursorInto: (field: "click" | "dragFrom" | "dragTo") => Promise<void>;
   // playback / record
@@ -159,9 +154,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const [tab, setTab] = useState<Tab>("autoclick");
   const [macroName, setMacroName] = useState("Untitled macro");
-  const [source, setSource] = useState<Source>("built");
   const [steps, setSteps] = useState<Step[]>([]);
-  const [recordedEvents, setRecordedEvents] = useState<MacroEvent[]>([]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
 
   const [repeat, setRepeat] = useState(0);
@@ -220,10 +213,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     resolve?: (ok: boolean) => void;
   }>({ open: false, title: "", confirmLabel: "Confirm", destructive: false });
 
-  const events = useMemo(
-    () => (source === "recorded" ? recordedEvents : compileSteps(steps)),
-    [source, recordedEvents, steps],
-  );
+  const events = useMemo(() => compileSteps(steps), [steps]);
 
   const dismissToast = useCallback((id: number) => {
     setToasts((t) => t.filter((x) => x.id !== id));
@@ -347,10 +337,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         onRecordingEventAdded: (p) =>
           setRecording((r) => ({ ...r, count: p.count })),
         onRecordingStopped: (p) => {
+          // A recording is just a captured chunk in the sequence: fill the step
+          // we were recording into, or append a new "Recorded action" step
+          // (e.g. when started via the hotkey with no step pre-created).
           const stepId = recordingStepRef.current;
+          recordingStepRef.current = null;
           if (stepId) {
-            // Inline record-into-step: store the snippet on that step.
-            recordingStepRef.current = null;
             setSteps((prev) =>
               prev.map((s) =>
                 s.id === stepId
@@ -358,12 +350,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
                   : s,
               ),
             );
-            setDirty(true);
-            return;
+          } else {
+            const s: Step = { ...newStep("record"), events: p.macro.events };
+            setSteps((prev) => [...prev, s]);
+            setSelectedStepId(s.id);
+            setTab("steps");
           }
-          setRecordedEvents(p.macro.events);
-          setSource("recorded");
-          setTab("recorded");
           setDirty(true); // a fresh recording is unsaved
         },
         onPlaybackProgress: (p) =>
@@ -430,7 +422,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const s = newStep(action);
       setSteps((prev) => [...prev, s]);
       setSelectedStepId(s.id);
-      setSource("built");
       setDirty(true);
     },
     [setDirty],
@@ -485,14 +476,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [setDirty],
   );
 
-  const deleteRecordedEvent = useCallback(
-    (index: number) => {
-      setRecordedEvents((prev) => prev.filter((_, i) => i !== index));
-      setDirty(true);
-    },
-    [setDirty],
-  );
-
   // Record a live snippet directly into a step (toggle: start, then stop).
   const recordIntoStep = useCallback(
     async (stepId: string) => {
@@ -509,19 +492,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     },
     [recording.active, recordMode, captureKeyboard],
   );
-
-  const clearRecording = useCallback(async () => {
-    if (recordedEvents.length === 0) return;
-    const ok = await confirm({
-      title: "Clear recording?",
-      description: "Removes all recorded events from the editor. Saved macros are untouched.",
-      confirmLabel: "Clear",
-      destructive: true,
-    });
-    if (!ok) return;
-    setRecordedEvents([]);
-    setDirty(true);
-  }, [recordedEvents.length, confirm, setDirty]);
 
   const captureCursorInto = useCallback(
     async (field: "click" | "dragFrom" | "dragTo") => {
@@ -545,12 +515,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       version: 1,
       name: macroName,
       created: new Date().toISOString(),
-      source,
+      // A recorded chunk lives inside a step; the saved sequence is "built".
+      source: "built",
       settings: { repeat, speed },
       monitors: [],
       events: compileEvents,
     }),
-    [macroName, source, repeat, speed],
+    [macroName, repeat, speed],
   );
 
   const startAutoclick = useCallback(async () => {
@@ -564,19 +535,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       await startAutoclick();
       return;
     }
-    let evs: MacroEvent[];
-    if (source === "recorded") {
-      evs = recordedEvents;
-    } else {
-      const home = await ipc.captureCursor().catch(() => ({ x: 0, y: 0 }));
-      evs = compileSteps(steps, { home, rollJitter: true });
-    }
+    const home = await ipc.captureCursor().catch(() => ({ x: 0, y: 0 }));
+    const evs = compileSteps(steps, { home, rollJitter: true });
     if (evs.length === 0) {
       toast("Nothing to play — add a step or record first", "warn");
       return;
     }
     await ipc.playMacro(buildMacro(evs), { repeat, speed, jitter });
-  }, [tab, startAutoclick, source, recordedEvents, steps, repeat, speed, jitter, buildMacro, toast]);
+  }, [tab, startAutoclick, steps, repeat, speed, jitter, buildMacro, toast]);
 
   const stop = useCallback(async () => {
     await ipc.stopPlayback();
@@ -591,18 +557,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await ipc.stopRecording().catch(() => {});
   }, []);
 
-  // Recording UI state follows backend status:changed (see subscribe), so these
-  // just issue the command.
+  // Record appends a "Recorded action" step and captures into it — recording is
+  // just a fast way to author a chunk of the sequence. UI state follows backend
+  // status:changed (see subscribe).
   const toggleRecord = useCallback(async () => {
     if (recording.active) {
       await ipc.stopRecording();
-    } else {
-      await ipc.startRecording({
-        capture_mode: recordMode,
-        motion_sample_ms: 15,
-        capture_keyboard: captureKeyboard,
-      });
+      return;
     }
+    const s = newStep("record");
+    setSteps((prev) => [...prev, s]);
+    setSelectedStepId(s.id);
+    setTab("steps");
+    recordingStepRef.current = s.id;
+    await ipc.startRecording({
+      capture_mode: recordMode,
+      motion_sample_ms: 15,
+      capture_keyboard: captureKeyboard,
+    });
   }, [recording.active, recordMode, captureKeyboard]);
 
   // ── Hotkey routing ───────────────────────────────────────────────
@@ -626,33 +598,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [recordMode, captureKeyboard]);
 
   useEffect(() => {
-    let intent: PlayIntent;
-    if (tab === "autoclick") {
-      intent = { kind: "autoclick", opts: autoclick };
-    } else if (tab === "steps") {
-      intent = {
-        kind: "macro",
-        mac: buildMacro(compileSteps(steps)),
-        opts: { repeat, speed, jitter },
-      };
-    } else if (tab === "recorded") {
-      intent = {
-        kind: "macro",
-        mac: buildMacro(recordedEvents),
-        opts: { repeat, speed, jitter },
-      };
-    } else {
-      intent = { kind: "none" };
-    }
+    const intent: PlayIntent =
+      tab === "autoclick"
+        ? { kind: "autoclick", opts: autoclick }
+        : tab === "steps"
+          ? {
+              kind: "macro",
+              mac: buildMacro(compileSteps(steps)),
+              opts: { repeat, speed, jitter },
+            }
+          : { kind: "none" };
     ipc.setPlayIntent(intent).catch(() => {});
-  }, [tab, autoclick, steps, recordedEvents, repeat, speed, jitter, buildMacro]);
+  }, [tab, autoclick, steps, repeat, speed, jitter, buildMacro]);
 
   // ── Files ────────────────────────────────────────────────────────
   const newMacro = useCallback(async () => {
     if (!(await confirmDiscardIfDirty())) return;
     setSteps([]);
-    setRecordedEvents([]);
-    setSource("built");
     setMacroName("Untitled macro");
     setCurrentPath(null);
     savedName.current = null;
@@ -664,7 +626,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // name collision the prior version goes to Trash (restorable) after confirm.
   const persist = useCallback(
     async (name: string): Promise<boolean> => {
-      const evs = source === "recorded" ? recordedEvents : compileSteps(steps);
+      const evs = compileSteps(steps);
       if (evs.length === 0) {
         toast("Nothing to save — add a step or record first", "warn");
         return false;
@@ -708,7 +670,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
     },
-    [source, recordedEvents, steps, buildMacro, confirm, refreshLibrary, toast, setDirty],
+    [steps, buildMacro, confirm, refreshLibrary, toast, setDirty],
   );
 
   const saveCurrent = useCallback(async () => {
@@ -734,14 +696,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const macro = await ipc.loadMacro(m.path);
         setMacroName(macro.name);
-        setSource("recorded");
         setRepeat(macro.settings.repeat);
         setSpeed(macro.settings.speed);
         setCurrentPath(m.path);
         savedName.current = macro.name; // re-saving won't prompt
-        // Built and recorded macros both arrive as a compiled timeline.
-        setRecordedEvents(macro.events);
-        setTab("recorded");
+        // A saved macro is a compiled timeline; load it as one recorded chunk
+        // in the sequence (playable + editable as a whole).
+        const s: Step = { ...newStep("record"), events: macro.events };
+        setSteps([s]);
+        setSelectedStepId(s.id);
+        setTab("steps");
         setDirty(false);
         toast(`Loaded ${macro.name}`, "success");
       } catch (e) {
@@ -800,7 +764,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const armSchedule = useCallback(
     async (s: Schedule) => {
       try {
-        const evs = source === "recorded" ? recordedEvents : compileSteps(steps);
+        const evs = compileSteps(steps);
         if (evs.length === 0) {
           toast("Nothing to schedule", "warn");
           return;
@@ -812,7 +776,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         toast(`${e}`, "error");
       }
     },
-    [source, recordedEvents, steps, buildMacro, refreshSchedules, toast],
+    [steps, buildMacro, refreshSchedules, toast],
   );
 
   const cancelSchedule = useCallback(
@@ -905,10 +869,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTab,
     macroName,
     setMacroName: setMacroNameDirty,
-    source,
     steps,
-    recordedEvents,
-    deleteRecordedEvent,
     events,
     selectedStepId,
     setSelectedStepId,
@@ -939,7 +900,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     duplicateStep,
     moveStep,
     recordIntoStep,
-    clearRecording,
     captureCursorInto,
     play,
     stop,

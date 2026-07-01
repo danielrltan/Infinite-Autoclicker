@@ -1,11 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  MousePointerClick,
-  ListOrdered,
-  Circle,
-  Sparkles,
-  Clock,
-} from "lucide-react";
+import { MousePointerClick, ListOrdered, Sparkles, Clock } from "lucide-react";
 import type { Tab } from "@/store";
 
 export interface TabMeta {
@@ -17,8 +11,7 @@ export interface TabMeta {
 
 export const TABS: TabMeta[] = [
   { value: "autoclick", label: "Auto Clicker", kind: "config", icon: <MousePointerClick className="h-4 w-4" /> },
-  { value: "steps", label: "Steps", kind: "macro", icon: <ListOrdered className="h-4 w-4" /> },
-  { value: "recorded", label: "Recorder", kind: "macro", icon: <Circle className="h-4 w-4" /> },
+  { value: "steps", label: "Sequence", kind: "macro", icon: <ListOrdered className="h-4 w-4" /> },
   { value: "color", label: "Color Trigger", kind: "config", icon: <Sparkles className="h-4 w-4" /> },
   { value: "schedule", label: "Scheduler", kind: "config", icon: <Clock className="h-4 w-4" /> },
 ];

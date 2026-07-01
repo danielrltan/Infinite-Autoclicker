@@ -2,7 +2,12 @@
 // msedgedriver → WebView2). Covers the flows that kept breaking — recording
 // start/stop and the always-available Stop — so the app is tested, not the owner.
 //
-//   bun run test:e2e      (after `bun run build` + `cargo build` in src-tauri)
+// Build the app first as a PRODUCTION bundle so the frontend is embedded (a plain
+// debug `cargo build` points the webview at the Vite dev server and shows a blank
+// error page when it isn't running):
+//
+//   bun run tauri build --debug --no-bundle
+//   bun run test:e2e
 //
 // Overrides via env: APP_EXE, MSEDGEDRIVER, TAURI_DRIVER, WD_PORT.
 
@@ -30,7 +35,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function preflight() {
   const missing = [];
   if (!existsSync(APP_EXE))
-    missing.push(`app binary: ${APP_EXE} (run: bun run build && (cd src-tauri && cargo build))`);
+    missing.push(`app binary: ${APP_EXE} (run: bun run tauri build --debug --no-bundle)`);
   if (!existsSync(MSEDGEDRIVER)) missing.push(`msedgedriver: ${MSEDGEDRIVER}`);
   if (!existsSync(TAURI_DRIVER)) missing.push(`tauri-driver: ${TAURI_DRIVER} (cargo install tauri-driver)`);
   if (missing.length) {
@@ -72,14 +77,14 @@ test("launches on the Auto Clicker tab", async (driver) => {
 });
 
 test("tabs navigate", async (driver) => {
-  await clickButton(driver, "Steps");
+  await clickButton(driver, "Sequence");
   await waitText(driver, "Add step");
   await clickButton(driver, "Auto Clicker");
   await waitText(driver, "Click interval");
 });
 
 test("recording starts and STOPS (the reported bug)", async (driver) => {
-  await clickButton(driver, "Recorder");
+  await clickButton(driver, "Sequence");
   await clickButton(driver, "Record ("); // "Record (F5)"
   // Backend flips status → the pill reads Recording and a Stop appears.
   await waitText(driver, "Recording");
@@ -90,7 +95,7 @@ test("recording starts and STOPS (the reported bug)", async (driver) => {
 });
 
 test("adding a step works", async (driver) => {
-  await clickButton(driver, "Steps");
+  await clickButton(driver, "Sequence");
   await clickButton(driver, "Add step");
   await waitText(driver, "Edit step");
 });

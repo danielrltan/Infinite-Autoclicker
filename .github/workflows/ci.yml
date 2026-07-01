@@ -75,11 +75,9 @@ jobs:
           workspaces: src-tauri
 
       - run: bun install --frozen-lockfile
-      - run: bun run build
 
-      - name: Build app binary (embeds frontend)
-        working-directory: src-tauri
-        run: cargo build
+      - name: Build app (production frontend embedded, no installers)
+        run: bun run tauri build --debug --no-bundle
 
       - name: Install tauri-driver
         run: cargo install tauri-driver --locked

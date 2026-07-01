@@ -14,7 +14,6 @@ import { Banners } from "@/components/Onboarding/Banners";
 import { Timeline } from "@/components/Timeline/Timeline";
 import { AutoClicker } from "@/components/AutoClicker/AutoClicker";
 import { StepBuilder } from "@/components/StepBuilder/StepBuilder";
-import { EventList } from "@/components/EventList/EventList";
 import { RunControls } from "@/components/RunControls";
 import { ColorTrigger } from "@/components/ColorTrigger/ColorTrigger";
 import { Scheduler } from "@/components/Scheduler/Scheduler";
@@ -59,14 +58,8 @@ export default function App() {
 
               <TabsContent value="steps" className="mt-0 space-y-4">
                 <Timeline />
-                <StepBuilder />
-                <RunControls />
-              </TabsContent>
-
-              <TabsContent value="recorded" className="mt-0 space-y-4">
-                <Timeline />
                 <RecorderControls />
-                <EventList />
+                <StepBuilder />
                 <RunControls />
               </TabsContent>
 
