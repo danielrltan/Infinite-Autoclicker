@@ -96,12 +96,21 @@ pub fn stop_playback(core: State<AppCore>) {
 
 #[tauri::command]
 pub fn start_recording(app: AppHandle, core: State<AppCore>, opts: RecordOpts) {
+    // Ignore if already recording, so a double-start can't reset the buffer.
+    if core.recorder.is_active() {
+        return;
+    }
     core.recorder.start(opts);
     core.set_status(&app, AppState::Recording);
 }
 
+/// Safe to call anytime: if not recording it's a no-op (returns an empty macro
+/// and emits nothing), so a "stop" never wipes the current events by accident.
 #[tauri::command]
 pub fn stop_recording(app: AppHandle, core: State<AppCore>) -> Macro {
+    if !core.recorder.is_active() {
+        return crate::model::Macro::empty("Recorded macro", crate::model::Source::Recorded);
+    }
     let monitors = current_monitors(&app);
     let m = core.recorder.stop("Recorded macro", monitors);
     core.set_status(&app, AppState::Idle);

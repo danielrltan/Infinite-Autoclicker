@@ -116,6 +116,7 @@ interface AppContextValue {
   // playback / record
   play: () => Promise<void>;
   stop: () => Promise<void>;
+  stopEverything: () => Promise<void>;
   toggleRecord: () => Promise<void>;
   // files
   newMacro: () => Promise<void>;
@@ -582,6 +583,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await ipc.stopColorTrigger().catch(() => {});
   }, []);
 
+  // Halt anything active — playback, color trigger, auto clicker, OR recording.
+  // Both commands are no-ops when their thing isn't running, so this is always
+  // safe and can be the single always-available Stop.
+  const stopEverything = useCallback(async () => {
+    await ipc.stopPlayback().catch(() => {});
+    await ipc.stopRecording().catch(() => {});
+  }, []);
+
   // Recording UI state follows backend status:changed (see subscribe), so these
   // just issue the command.
   const toggleRecord = useCallback(async () => {
@@ -934,6 +943,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     captureCursorInto,
     play,
     stop,
+    stopEverything,
     toggleRecord,
     newMacro,
     saveCurrent,

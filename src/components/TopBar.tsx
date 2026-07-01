@@ -13,7 +13,7 @@ export function TopBar() {
     status,
     recording,
     play,
-    stop,
+    stopEverything,
     macroName,
     setMacroName,
     newMacro,
@@ -25,17 +25,20 @@ export function TopBar() {
   const isPlaying = status === "playing";
   const isRecording = recording.active;
   const macroTab = isMacroTab(tab);
+  const active = isPlaying || isRecording;
 
   return (
     <header className="flex h-12 shrink-0 items-center border-b border-border bg-bg">
       <div className="shell-col flex items-center gap-3">
-        {/* Zone 1 — transport + status */}
-        {isPlaying ? (
-          <Button variant="destructive" size="sm" onClick={stop}>
+        {/* Zone 1 — transport + status. A single always-available Stop halts
+            whatever is running (playback, auto clicker, color trigger, or a
+            recording), from any tab. */}
+        {active ? (
+          <Button variant="destructive" size="sm" onClick={stopEverything}>
             <Square className="h-4 w-4 fill-current" /> Stop
           </Button>
         ) : macroTab ? (
-          <Button variant="play" size="sm" onClick={play} disabled={isRecording}>
+          <Button variant="play" size="sm" onClick={play}>
             <Play className="h-4 w-4 fill-current" /> Play
           </Button>
         ) : null}

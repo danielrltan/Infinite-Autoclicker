@@ -236,6 +236,18 @@ mod tests {
     }
 
     #[test]
+    fn stop_is_safe_to_call_again() {
+        let r = rec(CaptureMode::FullMotion, true, 15);
+        r.feed_at(&RawInput::Move { x: 5, y: 5 }, (0, 0), &[], 0);
+        let first = r.stop("a", vec![]);
+        assert_eq!(first.events.len(), 1);
+        // Second stop while inactive: empty, no panic, still inactive.
+        let second = r.stop("b", vec![]);
+        assert_eq!(second.events.len(), 0);
+        assert!(!r.is_active());
+    }
+
+    #[test]
     fn stop_produces_recorded_macro() {
         let r = rec(CaptureMode::FullMotion, true, 15);
         r.feed_at(&RawInput::Move { x: 5, y: 5 }, (0, 0), &[], 0);
