@@ -1,5 +1,14 @@
 import * as React from "react";
-import { Trash2, FileText, RotateCcw, X, Library as LibraryIcon } from "lucide-react";
+import {
+  Trash2,
+  FileText,
+  RotateCcw,
+  X,
+  Download,
+  FolderOpen,
+  Library as LibraryIcon,
+} from "lucide-react";
+import { save } from "@tauri-apps/plugin-dialog";
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
@@ -47,16 +56,39 @@ export function LibraryButton() {
 
 /** Saved macros as cards, plus the Trash. Used inside the Library dialog. */
 export function LibraryPanel({ onOpened }: { onOpened?: () => void }) {
-  const { library, loadFromLibrary, deleteFromLibrary } = useApp();
+  const { library, loadFromLibrary, deleteFromLibrary, toast } = useApp();
   const [trashOpen, setTrashOpen] = React.useState(false);
+
+  const revealFolder = () =>
+    ipc.revealMacroFolder().catch((e) => toast(`Couldn't open folder: ${e}`, "error"));
+
+  const exportMacro = async (m: MacroMeta) => {
+    try {
+      const dest = await save({
+        defaultPath: `${m.name}.json`,
+        filters: [{ name: "Macro", extensions: ["json"] }],
+      });
+      if (!dest) return;
+      const macro = await ipc.loadMacro(m.path);
+      await ipc.saveMacro(dest, macro, true);
+      toast(`Exported ${m.name}`, "success");
+    } catch (e) {
+      toast(`Export failed: ${e}`, "error");
+    }
+  };
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-title font-semibold">Saved macros</h2>
-        <Button size="sm" variant="ghost" onClick={() => setTrashOpen(true)}>
-          <Trash2 className="h-4 w-4" /> Trash
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button size="sm" variant="ghost" onClick={revealFolder}>
+            <FolderOpen className="h-4 w-4" /> Open folder
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setTrashOpen(true)}>
+            <Trash2 className="h-4 w-4" /> Trash
+          </Button>
+        </div>
       </div>
 
       {library.length === 0 ? (
@@ -74,6 +106,7 @@ export function LibraryPanel({ onOpened }: { onOpened?: () => void }) {
                 await loadFromLibrary(m);
                 onOpened?.();
               }}
+              onExport={() => exportMacro(m)}
               onDelete={() => deleteFromLibrary(m)}
             />
           ))}
@@ -88,10 +121,12 @@ export function LibraryPanel({ onOpened }: { onOpened?: () => void }) {
 function MacroCard({
   m,
   onOpen,
+  onExport,
   onDelete,
 }: {
   m: MacroMeta;
   onOpen: () => void;
+  onExport: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -109,14 +144,14 @@ function MacroCard({
     >
       <div className="flex items-start justify-between">
         <FileText className="h-4 w-4 text-muted/60" />
-        <IconButton
-          label={`Delete ${m.name}`}
-          variant="danger"
-          className="opacity-0 transition-opacity group-hover:opacity-100"
-          onClick={onDelete}
-        >
-          <Trash2 className="h-4 w-4" />
-        </IconButton>
+        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+          <IconButton label={`Export ${m.name}`} onClick={onExport}>
+            <Download className="h-4 w-4" />
+          </IconButton>
+          <IconButton label={`Delete ${m.name}`} variant="danger" onClick={onDelete}>
+            <Trash2 className="h-4 w-4" />
+          </IconButton>
+        </div>
       </div>
       <div className="mt-2 truncate text-ui font-medium">{m.name}</div>
       <div className="tabular mt-0.5 text-body text-muted">

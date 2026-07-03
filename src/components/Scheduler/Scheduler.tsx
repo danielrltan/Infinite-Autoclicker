@@ -192,7 +192,7 @@ function scheduleLabel(s: ScheduleInfo): string {
 }
 
 function countdown(s: ScheduleInfo): string {
-  if (s.next_run_ms == null) return "—";
+  if (s.next_run_ms == null) return "";
   const ms = s.next_run_ms - Date.now();
   if (ms <= 0) return "now";
   return `in ${fmtClock(ms)}`;

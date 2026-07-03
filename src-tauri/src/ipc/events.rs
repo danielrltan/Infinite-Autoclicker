@@ -40,6 +40,7 @@ pub enum FinishReason {
 pub enum HotkeyAction {
     Record,
     PlayStop,
+    AutoclickToggle,
     Capture,
     Panic,
 }

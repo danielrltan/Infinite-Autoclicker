@@ -71,49 +71,53 @@ async function waitGone(driver, locator, t = 10000) {
 }
 
 // ── scenarios ──────────────────────────────────────────────────────
-test("launches on the Auto Clicker tab", async (driver) => {
-  await waitText(driver, "Auto Clicker");
-  await waitText(driver, "Click interval");
+// One screen, no tabs, no popups: the auto-click card and the sequence are both
+// always visible; color detection is a step.
+test("launches on the workspace", async (driver) => {
+  await waitText(driver, "Steps");
+  await driver.wait(until.elementLocated(btn("Add step")), 10000);
+  await driver.wait(until.elementLocated(btn("Play")), 10000);
 });
 
-test("tabs navigate", async (driver) => {
-  await clickButton(driver, "Sequence");
-  await waitText(driver, "Add step");
-  await clickButton(driver, "Auto Clicker");
-  await waitText(driver, "Click interval");
+test("auto-click card is inline (no popup)", async (driver) => {
+  await waitText(driver, "Auto-click");
+  await waitText(driver, "Click interval"); // shown right on the card
+  await driver.wait(until.elementLocated(btn("Start")), 10000);
 });
 
 test("recording starts and STOPS (the reported bug)", async (driver) => {
-  await clickButton(driver, "Sequence");
-  await clickButton(driver, "Record ("); // "Record (F5)"
+  await clickButton(driver, "Record ("); // "Record (F4)"
   // Backend flips status → the pill reads Recording and a Stop appears.
   await waitText(driver, "Recording");
-  await clickButton(driver, "Stop"); // top-bar always-available Stop
+  await clickButton(driver, "Stop"); // the record toggle becomes Stop (F4)
   // Must return to idle + the Record button must be back.
   await waitText(driver, "Idle");
   await driver.wait(until.elementLocated(btn("Record (")), 10000);
 });
 
 test("adding a step works", async (driver) => {
-  await clickButton(driver, "Sequence");
   await clickButton(driver, "Add step");
   await waitText(driver, "Edit step");
 });
 
 test("color step can be added to the sequence", async (driver) => {
-  await clickButton(driver, "Sequence");
   await clickButton(driver, "Add step");
   await waitText(driver, "Edit step");
-  // Open the Action dropdown (first Radix combobox in the editor) → Click color.
-  const combos = await driver.findElements(By.css('button[role="combobox"]'));
-  await combos[0].click();
+  // The step editor's Action select reads exactly "Click" for a new step
+  // (distinct from the auto-click card's "Mouse click" combobox). Open it → Click color.
+  const actionSelect = await driver.wait(
+    until.elementLocated(By.xpath("//button[@role='combobox'][normalize-space(.)='Click']")),
+    10000,
+  );
+  await actionSelect.click();
   const opt = await driver.wait(
     until.elementLocated(By.xpath("//*[@role='option'][contains(normalize-space(.), 'Click color')]")),
     10000,
   );
   await opt.click();
-  // The color editor fields appear.
+  // The color editor fields appear (incl. the folded-in search regions).
   await waitText(driver, "Target color");
+  await waitText(driver, "Search regions");
 });
 
 // ── run ────────────────────────────────────────────────────────────

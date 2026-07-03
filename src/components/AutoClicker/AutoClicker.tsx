@@ -4,11 +4,12 @@ import { useApp } from "@/store";
 import { ipc } from "@/lib/ipc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, Section } from "@/components/ui/card";
-import { Field, FieldRow } from "@/components/ui/field";
+import { Card } from "@/components/ui/card";
+import { Kbd } from "@/components/ui/kbd";
+import { Field } from "@/components/ui/field";
 import { SegmentedControl } from "@/components/ui/segmented";
 import { CaptureButton } from "@/components/ui/capture-button";
-import { Kbd } from "@/components/ui/kbd";
+import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -16,7 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Slider } from "@/components/ui/slider";
 import type { MouseButton } from "@/lib/types";
 
 function splitMs(ms: number) {
@@ -28,7 +28,10 @@ function splitMs(ms: number) {
   };
 }
 
-/** OP Auto Clicker's main window: interval, options, repeat, position, Start/Stop. */
+/**
+ * The namesake, as one inline card (no popup): interval + every option + Start.
+ * Drives the dedicated fast auto-click engine, separate from the macro player.
+ */
 export function AutoClicker() {
   const { autoclick, setAutoclick, startAutoclick, stop, status, colorClicks, settings } =
     useApp();
@@ -54,12 +57,19 @@ export function AutoClicker() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      {/* Hero — interval + big readout */}
-      <Card>
-        <div className="flex items-end justify-between gap-6">
+    <Card className="space-y-4 p-4">
+      {/* Interval + primary action */}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+          <div className="flex items-center gap-2 pb-2">
+            <MousePointerClick className="h-4 w-4 text-accent" />
+            <span className="text-overline font-semibold uppercase text-muted">
+              Auto-click
+            </span>
+          </div>
+
           <div>
-            <h3 className="mb-2 text-overline font-semibold uppercase text-muted">
+            <h3 className="mb-1.5 text-overline font-medium uppercase text-muted">
               Click interval
             </h3>
             <div className="flex items-end gap-1">
@@ -72,19 +82,38 @@ export function AutoClicker() {
               <TimeField unit="ms" value={ms} onChange={(v) => { setMs(v); writeInterval(h, m, s, v); }} wide />
             </div>
           </div>
-          <div className="tabular text-3xl font-semibold leading-none text-text">
+
+          <div className="tabular pb-1.5 text-2xl font-semibold leading-none text-text">
             {autoclick.interval_ms.toLocaleString()}
-            <span className="ml-1 text-base font-normal text-muted">ms</span>
+            <span className="ml-1 text-sm font-normal text-muted">ms</span>
           </div>
         </div>
-      </Card>
 
-      {/* Options + repeat — one dense card */}
-      <Section
-        title="Click options"
-        bodyClassName="p-0 space-y-0 divide-y divide-border/60"
-      >
-        <FieldRow label="Action" className="px-4">
+        <Button
+          size="lg"
+          variant={running ? "destructive" : "play"}
+          onClick={running ? stop : startAutoclick}
+          className="h-11 min-w-[8rem] justify-center gap-2 text-ui font-semibold"
+        >
+          {running ? (
+            <>
+              <Square className="h-4 w-4 fill-current" /> Stop
+              {colorClicks !== null && ` · ${colorClicks}`}
+            </>
+          ) : (
+            <>
+              <MousePointerClick className="h-4 w-4" /> Start
+              <Kbd className="ml-0.5 border-white/20 bg-white/15 text-white/90">
+                {settings.hotkeys.autoclick_toggle}
+              </Kbd>
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Every option, inline */}
+      <div className="grid gap-x-6 gap-y-4 border-t border-border/60 pt-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Field label="Action">
           <Select
             value={keyMode ? "key" : "mouse"}
             onValueChange={(v) =>
@@ -94,27 +123,27 @@ export function AutoClicker() {
               })
             }
           >
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="mouse">Mouse click</SelectItem>
               <SelectItem value="key">Press key</SelectItem>
             </SelectContent>
           </Select>
-        </FieldRow>
+        </Field>
 
-        <FieldRow label={keyMode ? "Key" : "Mouse button"} className="px-4">
+        <Field label={keyMode ? "Key (recorded)" : "Mouse button"}>
           {keyMode ? (
             <CaptureButton
               value={autoclick.key_code ?? ""}
               onCapture={(code) => setAutoclick({ ...autoclick, key_code: code })}
-              className="w-40"
+              className="w-full"
             />
           ) : (
             <Select
               value={autoclick.button}
               onValueChange={(v) => setAutoclick({ ...autoclick, button: v as MouseButton })}
             >
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="left">Left</SelectItem>
                 <SelectItem value="middle">Middle</SelectItem>
@@ -122,24 +151,24 @@ export function AutoClicker() {
               </SelectContent>
             </Select>
           )}
-        </FieldRow>
+        </Field>
 
-        <FieldRow label={keyMode ? "Press type" : "Click type"} className="px-4">
+        <Field label={keyMode ? "Press type" : "Click type"}>
           <Select
             value={clickType}
             onValueChange={(v) => setAutoclick({ ...autoclick, clicks_per_event: parseInt(v) })}
           >
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="1">Single</SelectItem>
               <SelectItem value="2">Double</SelectItem>
               <SelectItem value="3">Triple</SelectItem>
             </SelectContent>
           </Select>
-        </FieldRow>
+        </Field>
 
-        <FieldRow label="Repeat" className="px-4">
-          <div className="flex items-center gap-3">
+        <Field label="Repeat">
+          <div className="flex items-center gap-2">
             <SegmentedControl
               value={autoclick.repeat === 0 ? "inf" : "n"}
               onChange={(v) =>
@@ -153,105 +182,63 @@ export function AutoClicker() {
             <Input
               type="number"
               min={1}
-              className="tabular h-9 w-20"
+              className="tabular h-9 w-16"
               disabled={autoclick.repeat === 0}
               value={autoclick.repeat === 0 ? 50 : autoclick.repeat}
               onChange={(e) =>
                 setAutoclick({ ...autoclick, repeat: Math.max(1, parseInt(e.target.value) || 1) })
               }
             />
-            <span className="text-body text-muted">times</span>
           </div>
-        </FieldRow>
-      </Section>
+        </Field>
 
-      {/* Position + randomize — balanced, no dead space */}
-      <div className={keyMode ? "" : "grid grid-cols-2 items-start gap-3"}>
         {!keyMode && (
-          <Section title="Cursor position">
-            <SegmentedControl
-              value={autoclick.use_fixed_pos ? "fixed" : "current"}
-              onChange={(v) =>
-                setAutoclick({ ...autoclick, use_fixed_pos: v === "fixed" })
-              }
-              options={[
-                { value: "current", label: "Current" },
-                { value: "fixed", label: "Fixed" },
-              ]}
-            />
-            {autoclick.use_fixed_pos && (
-              <div className="flex items-end gap-2">
-                <Field label="X" className="flex-1">
+          <Field label="Cursor position">
+            <div className="flex items-center gap-2">
+              <SegmentedControl
+                value={autoclick.use_fixed_pos ? "fixed" : "current"}
+                onChange={(v) => setAutoclick({ ...autoclick, use_fixed_pos: v === "fixed" })}
+                options={[
+                  { value: "current", label: "Current" },
+                  { value: "fixed", label: "Fixed" },
+                ]}
+              />
+              {autoclick.use_fixed_pos && (
+                <>
                   <Input
                     type="number"
-                    className="tabular"
+                    aria-label="X"
+                    className="tabular h-9 w-16"
                     value={autoclick.x}
                     onChange={(e) => setAutoclick({ ...autoclick, x: parseInt(e.target.value) || 0 })}
                   />
-                </Field>
-                <Field label="Y" className="flex-1">
                   <Input
                     type="number"
-                    className="tabular"
+                    aria-label="Y"
+                    className="tabular h-9 w-16"
                     value={autoclick.y}
                     onChange={(e) => setAutoclick({ ...autoclick, y: parseInt(e.target.value) || 0 })}
                   />
-                </Field>
-                <Button size="icon" variant="outline" aria-label="Pick location" title="Pick location" onClick={pick}>
-                  <Crosshair className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </Section>
+                  <Button size="icon" variant="outline" aria-label="Pick location" title="Pick location" onClick={pick}>
+                    <Crosshair className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </Field>
         )}
 
-        <Section title="Randomized delay">
-          <Field label="Time" value={`±${Math.round(autoclick.jitter_time_pct * 100)}%`}>
-            <Slider
-              min={0}
-              max={50}
-              step={1}
-              value={[Math.round(autoclick.jitter_time_pct * 100)]}
-              onValueChange={(v) => setAutoclick({ ...autoclick, jitter_time_pct: (v[0] ?? 0) / 100 })}
-            />
-          </Field>
-          {!keyMode && autoclick.use_fixed_pos && (
-            <Field label="Position" value={`±${autoclick.jitter_pos_px}px`}>
-              <Slider
-                min={0}
-                max={50}
-                step={1}
-                value={[autoclick.jitter_pos_px]}
-                onValueChange={(v) => setAutoclick({ ...autoclick, jitter_pos_px: v[0] ?? 0 })}
-              />
-            </Field>
-          )}
-        </Section>
+        <Field label="Randomized delay" value={`±${Math.round(autoclick.jitter_time_pct * 100)}%`}>
+          <Slider
+            min={0}
+            max={50}
+            step={1}
+            value={[Math.round(autoclick.jitter_time_pct * 100)]}
+            onValueChange={(v) => setAutoclick({ ...autoclick, jitter_time_pct: (v[0] ?? 0) / 100 })}
+          />
+        </Field>
       </div>
-
-      {/* Primary action — the only Play on this tab */}
-      <div className="sticky bottom-0 z-10 -mx-4 border-t border-border bg-bg/85 px-4 py-3 backdrop-blur">
-        <Button
-          size="lg"
-          variant={running ? "destructive" : "play"}
-          onClick={running ? stop : startAutoclick}
-          className="h-11 w-full justify-center gap-2 text-ui font-semibold"
-        >
-          {running ? (
-            <>
-              <Square className="h-4 w-4 fill-current" /> Stop
-            </>
-          ) : (
-            <>
-              <MousePointerClick className="h-4 w-4" /> Start
-            </>
-          )}
-          <Kbd className="ml-1 border-white/20 bg-white/15 text-white/90">
-            {settings.hotkeys.play_stop_toggle}
-          </Kbd>
-        </Button>
-      </div>
-    </div>
+    </Card>
   );
 }
 
@@ -271,7 +258,7 @@ function TimeField({
       <Input
         type="number"
         min={0}
-        className={`tabular h-11 ${wide ? "w-16" : "w-12"} px-0 text-center text-lg font-medium`}
+        className={`tabular h-10 ${wide ? "w-14" : "w-11"} px-0 text-center text-base font-medium`}
         value={value}
         onChange={(e) => onChange(Math.max(0, parseInt(e.target.value) || 0))}
       />
@@ -280,4 +267,4 @@ function TimeField({
   );
 }
 
-const Colon = () => <span className="pb-6 text-lg text-muted">:</span>;
+const Colon = () => <span className="pb-6 text-base text-muted">:</span>;

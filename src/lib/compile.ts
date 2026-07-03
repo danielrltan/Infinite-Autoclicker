@@ -2,7 +2,7 @@
 // Steps *generate* a timeline (SPEC §6, §F1); built and recorded macros share
 // the same `MacroEvent[]` format and one playback engine.
 
-import type { MacroEvent, MouseButton, Rgb } from "./types";
+import type { MacroEvent, MouseButton, Rect, Rgb } from "./types";
 
 export type ClickType = "left" | "right" | "middle" | "double";
 export type ScrollDir = "up" | "down" | "left" | "right";
@@ -55,6 +55,8 @@ export interface Step {
   minBlob: number;
   moveBefore: boolean;
   colorTimeoutMs: number;
+  /** Screen regions to scan; empty = whole screen. */
+  regions: Rect[];
 
   // record (inline-recorded snippet)
   events: MacroEvent[];
@@ -102,6 +104,7 @@ export function newStep(action: StepAction = "click", x = 0, y = 0): Step {
     minBlob: 40,
     moveBefore: true,
     colorTimeoutMs: 0,
+    regions: [],
     events: [],
   };
 }
@@ -189,7 +192,7 @@ export function compileSteps(steps: Step[], opts: CompileOpts = {}): MacroEvent[
           match: {
             target: step.matchColor,
             tolerance: step.tolerance,
-            regions: [],
+            regions: step.regions,
             min_blob_px: step.minBlob,
           },
           button,
@@ -209,6 +212,57 @@ export function compileSteps(steps: Step[], opts: CompileOpts = {}): MacroEvent[
     }
   }
   return out;
+}
+
+/**
+ * Describe what a recorded snippet actually contains, so a "Recorded action"
+ * step reads as e.g. "4 clicks, 2 keys, motion" instead of an opaque event
+ * count. Recorder output is down/up/move/key/scroll; a saved macro loaded into
+ * a record step may also carry click/drag/findcolor. Returns "" for an empty or
+ * motion-free-of-actions snippet — callers decide the fallback wording.
+ */
+export function summarizeRecording(events: MacroEvent[]): string {
+  let clicks = 0;
+  let drags = 0;
+  let keys = 0;
+  let scrolls = 0;
+  let colors = 0;
+  let moves = 0;
+  for (const e of events) {
+    switch (e.kind) {
+      // A recorded press is one down (its up pairs with it); a built macro uses
+      // a single click event — both count as one click.
+      case "down":
+      case "click":
+        clicks += 1;
+        break;
+      case "drag":
+        drags += 1;
+        break;
+      case "key":
+        if (e.action === "press") keys += 1;
+        break;
+      case "scroll":
+        scrolls += 1;
+        break;
+      case "findcolor":
+        colors += 1;
+        break;
+      case "move":
+        moves += 1;
+        break;
+    }
+  }
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const parts: string[] = [];
+  if (clicks) parts.push(plural(clicks, "click"));
+  if (drags) parts.push(plural(drags, "drag"));
+  if (keys) parts.push(plural(keys, "key"));
+  if (scrolls) parts.push(plural(scrolls, "scroll"));
+  if (colors) parts.push(plural(colors, "color click"));
+  // Sampled motion points aren't a meaningful count to the user — flag it, not tally it.
+  if (moves) parts.push("motion");
+  return parts.join(", ");
 }
 
 /** Total compiled duration in ms (for the timeline scale). */

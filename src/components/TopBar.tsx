@@ -1,72 +1,39 @@
-import { Play, Square, Dot, FilePlus2, Save } from "lucide-react";
+import { Dot, FilePlus2, Save } from "lucide-react";
 import { useApp } from "@/store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Settings } from "@/components/Settings/Settings";
 import { LibraryButton } from "@/components/Library/Library";
 import { Tooltip } from "@/components/ui/tooltip";
-import { isMacroTab, tabLabel } from "@/lib/tabs";
 import { fmtClock } from "@/lib/utils";
 
+/** Identity + file/utility actions. Transport (Play/Stop) lives in the RunBar. */
 export function TopBar() {
-  const {
-    status,
-    recording,
-    play,
-    stopEverything,
-    macroName,
-    setMacroName,
-    newMacro,
-    saveCurrent,
-    dirty,
-    tab,
-  } = useApp();
-
-  const isPlaying = status === "playing";
+  const { recording, macroName, setMacroName, newMacro, saveCurrent, dirty } =
+    useApp();
   const isRecording = recording.active;
-  const macroTab = isMacroTab(tab);
-  const active = isPlaying || isRecording;
 
   return (
     <header className="flex h-12 shrink-0 items-center border-b border-border bg-bg">
       <div className="shell-col flex items-center gap-3">
-        {/* Zone 1 — transport + status. A single always-available Stop halts
-            whatever is running (playback, auto clicker, color trigger, or a
-            recording), from any tab. */}
-        {active ? (
-          <Button variant="destructive" size="sm" onClick={stopEverything}>
-            <Square className="h-4 w-4 fill-current" /> Stop
-          </Button>
-        ) : macroTab ? (
-          <Button variant="play" size="sm" onClick={play}>
-            <Play className="h-4 w-4 fill-current" /> Play
-          </Button>
-        ) : null}
+        {/* Identity — the sequence you're editing */}
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${dirty ? "bg-warn" : "bg-transparent"}`}
+            aria-hidden
+          />
+          <Input
+            aria-label="Sequence name"
+            value={macroName}
+            onChange={(e) => setMacroName(e.target.value)}
+            placeholder="Untitled sequence"
+            className="h-8 w-[240px] border-transparent bg-transparent px-1.5 text-ui font-medium hover:border-border focus:bg-surface"
+          />
+        </div>
+
         <StatusPill />
-        <div className="mx-1 h-5 w-px bg-border" />
 
-        {/* Zone 2 — context identity */}
-        {macroTab ? (
-          <div className="flex min-w-0 items-center gap-1.5">
-            <span
-              className={`h-1.5 w-1.5 shrink-0 rounded-full ${dirty ? "bg-warn" : "bg-transparent"}`}
-              aria-hidden
-            />
-            <Input
-              aria-label="Macro name"
-              value={macroName}
-              onChange={(e) => setMacroName(e.target.value)}
-              placeholder="Untitled macro"
-              className="h-8 w-[240px] border-transparent bg-transparent px-1.5 text-ui font-medium hover:border-border focus:bg-surface"
-            />
-          </div>
-        ) : (
-          <h1 className="truncate text-title font-semibold text-text">
-            {tabLabel(tab)}
-          </h1>
-        )}
-
-        {/* Zone 3 — utilities */}
+        {/* Utilities */}
         <div className="ml-auto flex items-center gap-1.5">
           {isRecording && (
             <span className="tabular flex items-center gap-1.5 text-body text-record">
@@ -74,33 +41,29 @@ export function TopBar() {
               {fmtClock(recording.elapsedMs)} · {recording.count}
             </span>
           )}
-          {macroTab && (
-            <>
-              <LibraryButton />
-              <Tooltip label="New macro">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="New macro"
-                  onClick={newMacro}
-                >
-                  <FilePlus2 className="h-5 w-5" />
-                </Button>
-              </Tooltip>
-              <Tooltip label={dirty ? "Save (unsaved changes)" : "Save"}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Save macro"
-                  onClick={saveCurrent}
-                  className={dirty ? "text-warn" : undefined}
-                >
-                  <Save className="h-5 w-5" />
-                </Button>
-              </Tooltip>
-              <div className="mx-1 h-5 w-px bg-border" />
-            </>
-          )}
+          <LibraryButton />
+          <Tooltip label="New sequence">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="New sequence"
+              onClick={newMacro}
+            >
+              <FilePlus2 className="h-5 w-5" />
+            </Button>
+          </Tooltip>
+          <Tooltip label={dirty ? "Save (unsaved changes)" : "Save"}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Save sequence"
+              onClick={saveCurrent}
+              className={dirty ? "text-warn" : undefined}
+            >
+              <Save className="h-5 w-5" />
+            </Button>
+          </Tooltip>
+          <div className="mx-1 h-5 w-px bg-border" />
           <Settings />
         </div>
       </div>

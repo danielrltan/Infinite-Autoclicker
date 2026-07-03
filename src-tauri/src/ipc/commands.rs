@@ -138,6 +138,29 @@ pub fn default_macro_dir(app: AppHandle) -> Result<String, String> {
     Ok(macro_dir(&app)?.to_string_lossy().to_string())
 }
 
+/// Open the macros folder in the OS file manager (local only, no network).
+#[tauri::command]
+pub fn reveal_macro_folder(app: AppHandle) -> Result<(), String> {
+    let dir = macro_dir(&app)?;
+    open_in_file_manager(&dir).map_err(|e| e.to_string())
+}
+
+fn open_in_file_manager(path: &std::path::Path) -> std::io::Result<()> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer").arg(path).spawn()?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open").arg(path).spawn()?;
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        std::process::Command::new("xdg-open").arg(path).spawn()?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn save_macro(app: AppHandle, path: String, mac: Macro, overwrite: bool) -> Result<(), String> {
     let dest =
@@ -421,6 +444,13 @@ pub fn set_record_opts(core: State<AppCore>, opts: RecordOpts) {
 #[tauri::command]
 pub fn set_play_intent(core: State<AppCore>, intent: PlayIntent) {
     *core.play_intent.lock().unwrap() = intent;
+}
+
+/// Cache the latest auto-click options so the auto-click hotkey (F6) can start
+/// the clicker even when the window is minimized.
+#[tauri::command]
+pub fn set_autoclick_opts(core: State<AppCore>, opts: AutoClickOpts) {
+    *core.autoclick_opts.lock().unwrap() = Some(opts);
 }
 
 // ── Drag-to-select region capture (Color Trigger) ──────────────────

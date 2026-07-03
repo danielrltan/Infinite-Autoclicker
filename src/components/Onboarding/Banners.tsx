@@ -29,7 +29,7 @@ export function Banners() {
           <div>
             <strong>Permissions needed.</strong> Input Monitoring lets the app
             record your clicks; Accessibility lets it play them back. Grant them,
-            then return — this updates automatically.
+            then return. This updates automatically.
           </div>
           <div className="flex gap-2">
             {!permissions.input_monitoring && (

@@ -13,6 +13,7 @@ import { ipc, subscribe } from "@/lib/ipc";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   compileSteps,
+  newId,
   newStep,
   type Step,
   type StepAction,
@@ -34,7 +35,6 @@ import type {
   Settings,
 } from "@/lib/types";
 
-export type Tab = "autoclick" | "steps" | "color" | "schedule";
 export interface ToastAction {
   label: string;
   onClick: () => void | Promise<void>;
@@ -64,8 +64,6 @@ interface AppContextValue {
   sessionType: SessionType;
   permissions: PermissionStatus;
   // editor
-  tab: Tab;
-  setTab: (t: Tab) => void;
   macroName: string;
   setMacroName: (s: string) => void;
   steps: Step[];
@@ -105,6 +103,10 @@ interface AppContextValue {
   deleteStep: (id: string) => void;
   duplicateStep: (id: string) => void;
   moveStep: (id: string, dir: -1 | 1) => void;
+  reorderSteps: (from: number, to: number) => void;
+  deleteSteps: (ids: string[]) => void;
+  duplicateSteps: (ids: string[]) => void;
+  updateSteps: (ids: string[], patch: Partial<Step>) => void;
   recordIntoStep: (stepId: string) => Promise<void>;
   // capture
   captureCursorInto: (field: "click" | "dragFrom" | "dragTo") => Promise<void>;
@@ -152,7 +154,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     input_monitoring: true,
   });
 
-  const [tab, setTab] = useState<Tab>("autoclick");
   const [macroName, setMacroName] = useState("Untitled macro");
   const [steps, setSteps] = useState<Step[]>([]);
   const [selectedStepId, setSelectedStepId] = useState<string | null>(null);
@@ -354,7 +355,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             const s: Step = { ...newStep("record"), events: p.macro.events };
             setSteps((prev) => [...prev, s]);
             setSelectedStepId(s.id);
-            setTab("steps");
           }
           setDirty(true); // a fresh recording is unsaved
         },
@@ -371,7 +371,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (p.reason === "panic") toast("Stopped by panic / failsafe", "warn");
           else if (p.reason === "error") toast("Playback error", "error");
         },
-        onHotkeyTriggered: (p) => handleHotkeyRef.current?.(p.action),
         onError: (p) => toast(p.message, "error"),
       });
     })();
@@ -476,6 +475,64 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [setDirty],
   );
 
+  // Drag-to-reorder: move the step at `from` to index `to`.
+  const reorderSteps = useCallback(
+    (from: number, to: number) => {
+      setSteps((prev) => {
+        if (
+          from === to ||
+          from < 0 ||
+          to < 0 ||
+          from >= prev.length ||
+          to >= prev.length
+        )
+          return prev;
+        const next = [...prev];
+        const [moved] = next.splice(from, 1);
+        if (!moved) return prev;
+        next.splice(to, 0, moved);
+        return next;
+      });
+      setDirty(true);
+    },
+    [setDirty],
+  );
+
+  // Bulk actions on a selection of steps.
+  const deleteSteps = useCallback(
+    (ids: string[]) => {
+      const set = new Set(ids);
+      setSteps((prev) => prev.filter((s) => !set.has(s.id)));
+      setDirty(true);
+    },
+    [setDirty],
+  );
+  const duplicateSteps = useCallback(
+    (ids: string[]) => {
+      const set = new Set(ids);
+      setSteps((prev) => {
+        const out: Step[] = [];
+        for (const s of prev) {
+          out.push(s);
+          if (set.has(s.id)) out.push({ ...s, id: newId(s.action) });
+        }
+        return out;
+      });
+      setDirty(true);
+    },
+    [setDirty],
+  );
+  const updateSteps = useCallback(
+    (ids: string[], patch: Partial<Step>) => {
+      const set = new Set(ids);
+      setSteps((prev) =>
+        prev.map((s) => (set.has(s.id) ? ({ ...s, ...patch } as Step) : s)),
+      );
+      setDirty(true);
+    },
+    [setDirty],
+  );
+
   // Record a live snippet directly into a step (toggle: start, then stop).
   const recordIntoStep = useCallback(
     async (stepId: string) => {
@@ -497,7 +554,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (field: "click" | "dragFrom" | "dragTo") => {
       const pos = await ipc.captureCursor();
       if (!selectedStepId) {
-        toast(`Captured ${pos.x}, ${pos.y} — select a step first`, "info");
+        toast(`Captured ${pos.x}, ${pos.y}. Select a step first`, "info");
         return;
       }
       if (field === "click") updateStep(selectedStepId, { x: pos.x, y: pos.y } as Partial<Step>);
@@ -529,20 +586,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await ipc.startAutoclick(autoclick);
   }, [autoclick]);
 
+  // Play (F5) runs the sequence. Auto-click has its own Start button + hotkey
+  // (F6) and its own fast engine, never routed through the macro player.
   const play = useCallback(async () => {
-    // On the Auto Clicker tab, the play/stop hotkey starts the clicker.
-    if (tab === "autoclick") {
-      await startAutoclick();
-      return;
-    }
     const home = await ipc.captureCursor().catch(() => ({ x: 0, y: 0 }));
     const evs = compileSteps(steps, { home, rollJitter: true });
     if (evs.length === 0) {
-      toast("Nothing to play — add a step or record first", "warn");
+      toast("Nothing to play. Add a step or record first", "warn");
       return;
     }
     await ipc.playMacro(buildMacro(evs), { repeat, speed, jitter });
-  }, [tab, startAutoclick, steps, repeat, speed, jitter, buildMacro, toast]);
+  }, [steps, repeat, speed, jitter, buildMacro, toast]);
 
   const stop = useCallback(async () => {
     await ipc.stopPlayback();
@@ -568,7 +622,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const s = newStep("record");
     setSteps((prev) => [...prev, s]);
     setSelectedStepId(s.id);
-    setTab("steps");
     recordingStepRef.current = s.id;
     await ipc.startRecording({
       capture_mode: recordMode,
@@ -577,13 +630,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [recording.active, recordMode, captureKeyboard]);
 
-  // ── Hotkey routing ───────────────────────────────────────────────
-  // Record, Play/Stop and Panic are handled in Rust (so they work even when the
-  // window is minimized). Only Capture needs the focused editor.
-  const handleHotkeyRef = useRef<(a: string) => void>();
-  handleHotkeyRef.current = (action: string) => {
-    if (action === "capture") void captureCursorInto("click");
-  };
+  // Record, Play/Stop and Panic are all handled in Rust (so they work even when
+  // the window is minimized); the UI subscribes to no hotkey actions.
 
   // Keep the backend's record options + play intent fresh so the record/play
   // hotkeys act correctly even while the webview is suspended (minimized).
@@ -597,19 +645,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .catch(() => {});
   }, [recordMode, captureKeyboard]);
 
+  // The play/stop hotkey (F5, works while minimized) always plays the sequence.
   useEffect(() => {
-    const intent: PlayIntent =
-      tab === "autoclick"
-        ? { kind: "autoclick", opts: autoclick }
-        : tab === "steps"
-          ? {
-              kind: "macro",
-              mac: buildMacro(compileSteps(steps)),
-              opts: { repeat, speed, jitter },
-            }
-          : { kind: "none" };
+    const intent: PlayIntent = {
+      kind: "macro",
+      mac: buildMacro(compileSteps(steps)),
+      opts: { repeat, speed, jitter },
+    };
     ipc.setPlayIntent(intent).catch(() => {});
-  }, [tab, autoclick, steps, repeat, speed, jitter, buildMacro]);
+  }, [steps, repeat, speed, jitter, buildMacro]);
+
+  // Push auto-click opts so the auto-click hotkey (F6) can start the clicker
+  // even while the window is minimized (the webview is suspended, Rust isn't).
+  useEffect(() => {
+    ipc.setAutoclickOpts(autoclick).catch(() => {});
+  }, [autoclick]);
 
   // ── Files ────────────────────────────────────────────────────────
   const newMacro = useCallback(async () => {
@@ -619,7 +669,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCurrentPath(null);
     savedName.current = null;
     setDirty(false);
-    setTab("steps");
   }, [confirmDiscardIfDirty, setDirty]);
 
   // Save by name; the path is built in Rust (no fragile string concat). On a
@@ -628,7 +677,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (name: string): Promise<boolean> => {
       const evs = compileSteps(steps);
       if (evs.length === 0) {
-        toast("Nothing to save — add a step or record first", "warn");
+        toast("Nothing to save. Add a step or record first", "warn");
         return false;
       }
       const macro: Macro = { ...buildMacro(evs), name };
@@ -705,7 +754,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const s: Step = { ...newStep("record"), events: macro.events };
         setSteps([s]);
         setSelectedStepId(s.id);
-        setTab("steps");
         setDirty(false);
         toast(`Loaded ${macro.name}`, "success");
       } catch (e) {
@@ -770,7 +818,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           return;
         }
         await ipc.scheduleMacro(buildMacro(evs), s);
-        toast("Scheduled — app must stay open", "success");
+        toast("Scheduled. The app must stay open", "success");
         await refreshSchedules();
       } catch (e) {
         toast(`${e}`, "error");
@@ -865,8 +913,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     settings,
     sessionType,
     permissions,
-    tab,
-    setTab,
     macroName,
     setMacroName: setMacroNameDirty,
     steps,
@@ -899,6 +945,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     deleteStep,
     duplicateStep,
     moveStep,
+    reorderSteps,
+    deleteSteps,
+    duplicateSteps,
+    updateSteps,
     recordIntoStep,
     captureCursorInto,
     play,
@@ -974,8 +1024,9 @@ function defaultSettings(): Settings {
   return {
     theme: "system",
     hotkeys: {
-      record_toggle: "F5",
-      play_stop_toggle: "F6",
+      record_toggle: "F4",
+      play_stop_toggle: "F5",
+      autoclick_toggle: "F6",
       capture_cursor: "F7",
       panic: "F12",
     },

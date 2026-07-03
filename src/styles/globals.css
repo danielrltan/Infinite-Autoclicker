@@ -3,9 +3,9 @@
 @tailwind utilities;
 
 @layer components {
-  /* One column knob shared by header / tabs / main / footer. */
+  /* One column knob shared by header / main / footer. */
   .shell-col {
-    @apply mx-auto w-full max-w-4xl px-4;
+    @apply mx-auto w-full max-w-7xl px-4;
   }
   /* Left rails: "you're editing this" vs "this is running". */
   .rail-accent {

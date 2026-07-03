@@ -120,15 +120,23 @@ pub struct ScheduleInfo {
 pub struct HotkeyConfig {
     pub record_toggle: String,
     pub play_stop_toggle: String,
+    /// Start/stop the auto-clicker. Defaulted for configs saved before it existed.
+    #[serde(default = "default_autoclick_toggle")]
+    pub autoclick_toggle: String,
     pub capture_cursor: String,
     pub panic: String,
+}
+
+fn default_autoclick_toggle() -> String {
+    "F6".into()
 }
 
 impl Default for HotkeyConfig {
     fn default() -> Self {
         Self {
-            record_toggle: "F5".into(),
-            play_stop_toggle: "F6".into(),
+            record_toggle: "F4".into(),
+            play_stop_toggle: "F5".into(),
+            autoclick_toggle: "F6".into(),
             capture_cursor: "F7".into(),
             panic: "F12".into(),
         }
@@ -137,10 +145,11 @@ impl Default for HotkeyConfig {
 
 impl HotkeyConfig {
     /// All configured hotkey codes — used so the recorder never records a hotkey.
-    pub fn codes(&self) -> [&str; 4] {
+    pub fn codes(&self) -> [&str; 5] {
         [
             &self.record_toggle,
             &self.play_stop_toggle,
+            &self.autoclick_toggle,
             &self.capture_cursor,
             &self.panic,
         ]

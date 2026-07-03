@@ -1,16 +1,19 @@
 import { useApp } from "@/store";
 import { Input } from "@/components/ui/input";
-import { Section } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Slider } from "@/components/ui/slider";
 
+/** Run options for the sequence. Rendered inside the RunBar's "Run" popover. */
 export function RunControls() {
   const { repeat, setRepeat, speed, setSpeed, jitter, setJitter } = useApp();
 
   return (
-    <Section title="Run controls">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Repeat (0 = ∞)">
+    <div className="space-y-4">
+      <h3 className="text-overline font-semibold uppercase text-muted">
+        Run controls
+      </h3>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Repeat" hint="0 = ∞">
           <Input
             type="number"
             min={0}
@@ -30,16 +33,18 @@ export function RunControls() {
         </Field>
       </div>
 
-      <div className="space-y-3 border-t border-border/60 pt-3">
-        <div className="flex items-center justify-between">
+      <div className="space-y-3 border-t border-border/60 pt-4">
+        <div>
           <h4 className="text-overline font-semibold uppercase text-muted">
             Humanization
           </h4>
-          <span className="text-body text-muted">
-            Natural variation — not an anti-cheat bypass
-          </span>
+          <p className="mt-1 text-body text-muted">
+            Natural variation, not an anti-cheat bypass.
+          </p>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {/* Stacked (not a viewport-`sm` grid) so each slider keeps full width in
+            the narrow inspector instead of cramming three across. */}
+        <div className="space-y-3">
           <Field label="Position" value={`±${jitter.position_radius_px}px`}>
             <Slider
               min={0}
@@ -75,6 +80,6 @@ export function RunControls() {
           </Field>
         </div>
       </div>
-    </Section>
+    </div>
   );
 }

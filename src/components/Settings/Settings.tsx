@@ -85,17 +85,17 @@ export function Settings() {
             }
           />
           <HotkeyRow
-            label="Play / Stop"
+            label="Play / Stop sequence"
             value={draft.hotkeys.play_stop_toggle}
             onChange={(play_stop_toggle) =>
               setDraft({ ...draft, hotkeys: { ...draft.hotkeys, play_stop_toggle } })
             }
           />
           <HotkeyRow
-            label="Capture cursor"
-            value={draft.hotkeys.capture_cursor}
-            onChange={(capture_cursor) =>
-              setDraft({ ...draft, hotkeys: { ...draft.hotkeys, capture_cursor } })
+            label="Start / Stop auto-click"
+            value={draft.hotkeys.autoclick_toggle}
+            onChange={(autoclick_toggle) =>
+              setDraft({ ...draft, hotkeys: { ...draft.hotkeys, autoclick_toggle } })
             }
           />
           <HotkeyRow
@@ -253,7 +253,7 @@ function findConflicts(h: HotkeyConfig): string[] {
   const entries: [string, string][] = [
     ["Record toggle", h.record_toggle],
     ["Play/Stop", h.play_stop_toggle],
-    ["Capture cursor", h.capture_cursor],
+    ["Auto-click", h.autoclick_toggle],
     ["Panic", h.panic],
   ];
   const out: string[] = [];

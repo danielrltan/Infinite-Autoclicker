@@ -130,6 +130,7 @@ export interface ScheduleInfo {
 export interface HotkeyConfig {
   record_toggle: string;
   play_stop_toggle: string;
+  autoclick_toggle: string;
   capture_cursor: string;
   panic: string;
 }

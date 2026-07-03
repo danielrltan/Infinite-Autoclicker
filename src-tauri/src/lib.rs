@@ -73,6 +73,7 @@ pub fn run() {
             commands::start_recording,
             commands::stop_recording,
             commands::default_macro_dir,
+            commands::reveal_macro_folder,
             commands::save_macro,
             commands::save_macro_by_name,
             commands::macro_exists,
@@ -104,6 +105,7 @@ pub fn run() {
             commands::stop_autoclick,
             commands::set_record_opts,
             commands::set_play_intent,
+            commands::set_autoclick_opts,
             commands::start_region_capture,
             commands::cancel_region_capture,
         ])

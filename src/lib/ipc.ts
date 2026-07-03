@@ -57,6 +57,7 @@ export const ipc = {
     invoke<string>("save_macro_by_name", { name, mac: macro, overwrite }),
   macroExists: (path: string) => invoke<boolean>("macro_exists", { path }),
   loadMacro: (path: string) => invoke<Macro>("load_macro", { path }),
+  revealMacroFolder: () => invoke<void>("reveal_macro_folder"),
   listMacros: () => invoke<MacroMeta[]>("list_macros"),
   listRecent: () => invoke<MacroMeta[]>("list_recent"),
   // Soft delete → returns the trash entry so the UI can offer Undo.
@@ -106,6 +107,8 @@ export const ipc = {
   setRecordOpts: (opts: RecordOpts) => invoke<void>("set_record_opts", { opts }),
   setPlayIntent: (intent: PlayIntent) =>
     invoke<void>("set_play_intent", { intent }),
+  setAutoclickOpts: (opts: AutoClickOpts) =>
+    invoke<void>("set_autoclick_opts", { opts }),
 
   // Drag-to-select screen region (Color Trigger)
   startRegionCapture: () => invoke<void>("start_region_capture"),

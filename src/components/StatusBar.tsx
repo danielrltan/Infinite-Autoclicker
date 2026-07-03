@@ -9,11 +9,8 @@ export function StatusBar() {
       <div className="shell-col flex items-center gap-4 py-1.5">
         <Hint k={h.record_toggle} label="Rec" />
         <Hint k={h.play_stop_toggle} label="Play" />
-        <Hint k={h.capture_cursor} label="Capture" />
+        <Hint k={h.autoclick_toggle} label="Auto-click" />
         <Hint k={h.panic} label="Panic" />
-        <span className="ml-auto font-medium text-muted/80">
-          No network · no telemetry
-        </span>
       </div>
     </footer>
   );

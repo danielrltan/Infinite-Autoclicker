@@ -25,8 +25,8 @@ use crate::ipc::events::{
 };
 use crate::model::{KeyAction, Macro, Monitor, PlaybackOpts, RecordOpts, Settings};
 
-/// What the global Play/Stop hotkey (F8) should start when nothing is running.
-/// The frontend pushes this whenever the active mode/data changes, so F8 works
+/// What the global Play/Stop hotkey (F6) should start when nothing is running.
+/// The frontend pushes this whenever the active mode/data changes, so F6 works
 /// even when the window is minimized (the webview is suspended; Rust isn't).
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -60,6 +60,9 @@ pub struct AppCore {
     pub monitors: Arc<Mutex<Vec<Monitor>>>,
     pub record_opts: Arc<Mutex<RecordOpts>>,
     pub play_intent: Arc<Mutex<PlayIntent>>,
+    /// Latest auto-click options, pushed by the UI so the auto-click hotkey (F6)
+    /// can start the clicker even while the window is minimized.
+    pub autoclick_opts: Arc<Mutex<Option<AutoClickOpts>>>,
     pub region_capture: Arc<Mutex<RegionCapture>>,
     pub rt: Arc<Runtime>,
 }
@@ -108,6 +111,7 @@ impl AppCore {
             monitors,
             record_opts: Arc::new(Mutex::new(RecordOpts::default())),
             play_intent: Arc::new(Mutex::new(PlayIntent::None)),
+            autoclick_opts: Arc::new(Mutex::new(None)),
             region_capture: Arc::new(Mutex::new(RegionCapture::default())),
             rt,
         }
@@ -348,7 +352,7 @@ pub fn start_consumer(core: AppCore, app: AppHandle, rx: Receiver<RawInput>) {
     thread::Builder::new()
         .name("input-consumer".into())
         .spawn(move || {
-            // This thread owns the stop hotkeys (F8/F12) + corner failsafe. It
+            // This thread owns the stop hotkeys (F6/F12) + corner failsafe. It
             // must never die, or the user can get stuck under a running clicker.
             // Contain any per-event panic so the kill switch stays alive (in
             // release, panic=abort kills the process instead — also safe).
@@ -429,15 +433,23 @@ fn process_event(core: &AppCore, app: &AppHandle, raw: &RawInput) {
         }
     }
 
-    // 2) Hotkeys — only on key press.
-    if let RawInput::Key {
-        code,
-        action: KeyAction::Press,
-    } = raw
-    {
-        if let Some(action) = core.hotkeys.match_action(code) {
-            handle_hotkey(core, app, action);
+    // 2) Hotkeys — edge-triggered. `on_press` suppresses OS auto-repeat for the
+    //    toggle actions (so a held F5/F6 doesn't flip play/record on→off→on);
+    //    `on_release` clears the held state for the next real press.
+    match raw {
+        RawInput::Key {
+            code,
+            action: KeyAction::Press,
+        } => {
+            if let Some(action) = core.hotkeys.on_press(code) {
+                handle_hotkey(core, app, action);
+            }
         }
+        RawInput::Key {
+            code,
+            action: KeyAction::Release,
+        } => core.hotkeys.on_release(code),
+        _ => {}
     }
 
     // 3) Corner failsafe — only on real user moves during playback.
@@ -483,6 +495,21 @@ fn handle_hotkey(core: &AppCore, app: &AppHandle, action: HotkeyAction) {
                 names::HOTKEY_TRIGGERED,
                 HotkeyTriggered {
                     action: HotkeyAction::PlayStop,
+                },
+            );
+        }
+        // Auto-click has its own hotkey: start the clicker with the last-pushed
+        // options, or stop whatever's running. Works while minimized.
+        HotkeyAction::AutoclickToggle => {
+            if core.anything_running() {
+                core.stop_all();
+            } else if let Some(opts) = core.autoclick_opts.lock().unwrap().clone() {
+                core.start_autoclick(app, opts);
+            }
+            let _ = app.emit(
+                names::HOTKEY_TRIGGERED,
+                HotkeyTriggered {
+                    action: HotkeyAction::AutoclickToggle,
                 },
             );
         }
