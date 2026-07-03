@@ -214,7 +214,10 @@ export function StepList() {
                       dragId === s.id && "opacity-40",
                     )}
                   >
-                    <td className="px-2" onClick={(e) => e.stopPropagation()}>
+                    <td
+                      className={cn("px-2", active && "rail-accent")}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <input
                         type="checkbox"
                         aria-label={`Select step ${i + 1}`}
@@ -227,7 +230,7 @@ export function StepList() {
                     <td className="cursor-grab text-muted/40 active:cursor-grabbing" title="Drag to reorder">
                       <GripVertical className="h-4 w-4" />
                     </td>
-                    <td className={cn("tabular pr-2 text-right text-label text-muted/70", active && "rail-accent")}>
+                    <td className="tabular pr-2 text-right text-label text-muted/70">
                       {i + 1}
                     </td>
                     <td className="whitespace-nowrap px-3">
