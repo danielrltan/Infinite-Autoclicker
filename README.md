@@ -165,14 +165,6 @@ change them in Settings.
   it from this page, the flag is a false positive. If you don't trust a
   download, you can always build it from the source code yourself (see below).
 
-## A warning about games
-
-Many online games ban automation, and their anti-cheat systems can detect
-simulated clicks no matter how human the timing looks. This app does **not**
-try to hide from anti-cheat, and using it in such games can get your account
-banned. That risk is yours. The humanize option exists for natural-feeling
-automation and accessibility, not for cheating.
-
 ## How to uninstall
 
 - **Windows**: Settings > Apps > Infinite Autoclicker > Uninstall.
