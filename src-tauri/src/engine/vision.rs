@@ -14,12 +14,19 @@ use serde::{Deserialize, Serialize};
 // `engine::vision::{Rgb, Rect, ColorMatchConfig}` paths keep working.
 pub use crate::model::vision::{ColorMatchConfig, Rect, Rgb};
 
-/// A captured RGBA frame. `origin_*` place its top-left in global screen coords.
+/// A captured RGBA frame. `origin_*` place its top-left in the global input-event
+/// space (logical points on macOS, physical pixels on Windows). `width`/`height`
+/// and the `rgba` buffer are in **physical** capture pixels, which on a HiDPI/
+/// Retina display are larger than the event space by `scale` (e.g. 2.0). All
+/// buffer indexing multiplies event-space coords by `scale`; the returned blob
+/// centroid divides back down so callers get event-space coordinates.
 pub struct Frame<'a> {
     pub origin_x: i32,
     pub origin_y: i32,
     pub width: u32,
     pub height: u32,
+    /// Physical capture pixels per event-space unit (1.0 except HiDPI/Retina).
+    pub scale: f64,
     pub rgba: &'a [u8],
 }
 
@@ -109,17 +116,20 @@ pub fn find_largest_blob(frame: &Frame, cfg: &ColorMatchConfig) -> Option<Blob> 
         color_dist_sq(px, cfg.target) <= tol_sq
     };
 
-    // Scan windows in frame-local coords (whole frame, or each region clamped).
+    // Scan windows in physical buffer coords (whole frame, or each region). The
+    // regions arrive in event-space points, so scale them up into buffer pixels.
+    let scale = if frame.scale > 0.0 { frame.scale } else { 1.0 };
+    let to_buf = |v: i32| (v as f64 * scale).round() as i32;
     let windows: Vec<(i32, i32, i32, i32)> = if cfg.regions.is_empty() {
         vec![(0, 0, fw, fh)]
     } else {
         cfg.regions
             .iter()
             .filter_map(|r| {
-                let sx0 = (r.x - frame.origin_x).max(0);
-                let sy0 = (r.y - frame.origin_y).max(0);
-                let sx1 = (r.x - frame.origin_x + r.w).min(fw);
-                let sy1 = (r.y - frame.origin_y + r.h).min(fh);
+                let sx0 = to_buf(r.x - frame.origin_x).max(0);
+                let sy0 = to_buf(r.y - frame.origin_y).max(0);
+                let sx1 = to_buf(r.x - frame.origin_x + r.w).min(fw);
+                let sy1 = to_buf(r.y - frame.origin_y + r.h).min(fh);
                 (sx0 < sx1 && sy0 < sy1).then_some((sx0, sy0, sx1, sy1))
             })
             .collect()
@@ -134,9 +144,12 @@ pub fn find_largest_blob(frame: &Frame, cfg: &ColorMatchConfig) -> Option<Blob> 
     if area < cfg.min_blob_px.max(1) {
         return None;
     }
+    // Centroid is a physical buffer pixel; divide back into event-space points.
+    let local_x = (sum_x / area as u64) as f64 / scale;
+    let local_y = (sum_y / area as u64) as f64 / scale;
     Some(Blob {
-        x: frame.origin_x + (sum_x / area as u64) as i32,
-        y: frame.origin_y + (sum_y / area as u64) as i32,
+        x: frame.origin_x + local_x.round() as i32,
+        y: frame.origin_y + local_y.round() as i32,
         area,
     })
 }
@@ -195,6 +208,7 @@ mod tests {
             origin_y: 0,
             width: 100,
             height: 100,
+            scale: 1.0,
             rgba: &data,
         };
         let blob = find_largest_blob(&frame, &cfg(YELLOW, 40, 1)).unwrap();
@@ -202,6 +216,39 @@ mod tests {
         assert!((blob.x - 24).abs() <= 1);
         assert!((blob.y - 24).abs() <= 1);
         assert_eq!(blob.area, 100);
+    }
+
+    #[test]
+    fn retina_scale_maps_buffer_pixels_back_to_event_points() {
+        // Retina: a 3024-wide physical buffer for a 1512-point display (scale 2).
+        // A blob painted at physical (200,200)-(240,240) must report its centroid
+        // in event-space points (~110), i.e. buffer/2, and a region given in
+        // points must scale up to cover it. Mirrors the Color Trigger path.
+        let data = buf(400, 400, BLUE, &[(200, 200, 40, 40, YELLOW)]);
+        let frame = Frame {
+            origin_x: 0,
+            origin_y: 0,
+            width: 400,
+            height: 400,
+            scale: 2.0,
+            rgba: &data,
+        };
+        // No region: centroid of physical [200,240) is ~219.5 → points ~110.
+        let blob = find_largest_blob(&frame, &cfg(YELLOW, 40, 1)).unwrap();
+        assert!((blob.x - 110).abs() <= 1, "x was {}", blob.x);
+        assert!((blob.y - 110).abs() <= 1, "y was {}", blob.y);
+
+        // A search region expressed in points must still contain the blob after
+        // being scaled up into buffer pixels.
+        let mut c = cfg(YELLOW, 40, 1);
+        c.regions = vec![Rect {
+            x: 90,
+            y: 90,
+            w: 40,
+            h: 40,
+        }];
+        let blob = find_largest_blob(&frame, &c).unwrap();
+        assert!((blob.x - 110).abs() <= 1);
     }
 
     #[test]
@@ -217,6 +264,7 @@ mod tests {
             origin_y: 0,
             width: 120,
             height: 60,
+            scale: 1.0,
             rgba: &data,
         };
         let blob = find_largest_blob(&frame, &cfg(YELLOW, 40, 1)).unwrap();
@@ -234,6 +282,7 @@ mod tests {
             origin_y: 0,
             width: 50,
             height: 50,
+            scale: 1.0,
             rgba: &data,
         };
         // 4-pixel blob, require >= 16 → filtered out.
@@ -248,6 +297,7 @@ mod tests {
             origin_y: 0,
             width: 40,
             height: 40,
+            scale: 1.0,
             rgba: &data,
         };
         let blob = find_largest_blob(&frame, &cfg(YELLOW, 40, 1)).unwrap();
@@ -268,6 +318,7 @@ mod tests {
             origin_y: 0,
             width: 100,
             height: 100,
+            scale: 1.0,
             rgba: &data,
         };
         let mut c = cfg(YELLOW, 40, 1);
@@ -300,6 +351,7 @@ mod tests {
             origin_y: 0,
             width: W,
             height: 100,
+            scale: 1.0,
             rgba: &data,
         };
         let mut c = cfg(YELLOW, 40, 1);
@@ -333,6 +385,7 @@ mod tests {
                     origin_y: 0,
                     width: 60,
                     height: 60,
+                    scale: 1.0,
                     rgba: d,
                 },
                 &cfg(YELLOW, 40, 1),

@@ -5,12 +5,15 @@
 use super::vision::{find_largest_blob, Blob, ColorMatchConfig, Frame, Rgb};
 use xcap::Monitor;
 
-/// An owned RGBA frame placed in global screen coords.
+/// An owned RGBA frame. `origin_*` are in the input-event space (points on
+/// macOS); `width`/`height`/`data` are physical capture pixels. `scale` is the
+/// physical-pixels-per-event-unit ratio (2.0 on a Retina display, 1.0 otherwise).
 pub struct CapturedFrame {
     pub origin_x: i32,
     pub origin_y: i32,
     pub width: u32,
     pub height: u32,
+    pub scale: f64,
     pub data: Vec<u8>,
 }
 
@@ -21,6 +24,7 @@ impl CapturedFrame {
             origin_y: self.origin_y,
             width: self.width,
             height: self.height,
+            scale: self.scale,
             rgba: &self.data,
         }
     }
@@ -33,16 +37,28 @@ pub fn capture_all() -> Result<Vec<CapturedFrame>, String> {
     for m in &monitors {
         let origin_x = m.x().map_err(|e| e.to_string())?;
         let origin_y = m.y().map_err(|e| e.to_string())?;
+        // xcap reports monitor width in the event space (logical points on
+        // macOS) but returns a *physical*-pixel capture buffer, so on Retina the
+        // buffer is `scale`x wider. Derive the scale from the two rather than
+        // assuming it. On Windows the event space is already physical pixels, so
+        // keep 1.0 and index the buffer directly (byte-identical to before).
+        let reported_w = m.width().map_err(|e| e.to_string())?;
         let img = m
             .capture_image()
             .map_err(|e| format!("capture failed: {e}"))?;
         let width = img.width();
         let height = img.height();
+        let scale = if cfg!(target_os = "macos") && reported_w > 0 {
+            width as f64 / reported_w as f64
+        } else {
+            1.0
+        };
         frames.push(CapturedFrame {
             origin_x,
             origin_y,
             width,
             height,
+            scale,
             data: img.into_raw(),
         });
     }
@@ -52,8 +68,10 @@ pub fn capture_all() -> Result<Vec<CapturedFrame>, String> {
 /// Read the color of a single screen pixel (eyedropper for color picking).
 pub fn pixel_at(x: i32, y: i32) -> Result<Option<Rgb>, String> {
     for cf in capture_all()? {
-        let lx = x - cf.origin_x;
-        let ly = y - cf.origin_y;
+        // (x, y) arrive in event-space points; scale up to index the physical
+        // capture buffer (identity on non-Retina / non-macOS).
+        let lx = ((x - cf.origin_x) as f64 * cf.scale).round() as i32;
+        let ly = ((y - cf.origin_y) as f64 * cf.scale).round() as i32;
         if lx >= 0 && ly >= 0 && (lx as u32) < cf.width && (ly as u32) < cf.height {
             let idx = ((ly as u32 * cf.width + lx as u32) as usize) * 4;
             if idx + 2 < cf.data.len() {

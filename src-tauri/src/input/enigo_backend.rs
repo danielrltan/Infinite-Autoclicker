@@ -12,7 +12,31 @@ use super::backend::{InputBackend, InputError, Result};
 use crate::model::{KeyAction, MouseButton};
 
 pub struct EnigoBackend {
-    inner: Mutex<Enigo>,
+    inner: Mutex<SendEnigo>,
+}
+
+/// enigo's macOS `Enigo` holds a `CGEventSource` (a `NonNull`, so not `Send`),
+/// which makes `Mutex<Enigo>` not `Sync` and blocks `InputBackend: Send + Sync`.
+/// `EnigoBackend` only ever touches the inner `Enigo` while holding its `Mutex`,
+/// so access is serialized to one thread at a time — assert `Send` on a newtype
+/// and deref to the wrapped `Enigo` so the method bodies stay unchanged.
+struct SendEnigo(Enigo);
+
+// SAFETY: the inner `Enigo` is reached only through `EnigoBackend::inner`'s
+// `Mutex`, i.e. never used concurrently from two threads.
+unsafe impl Send for SendEnigo {}
+
+impl std::ops::Deref for SendEnigo {
+    type Target = Enigo;
+    fn deref(&self) -> &Enigo {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for SendEnigo {
+    fn deref_mut(&mut self) -> &mut Enigo {
+        &mut self.0
+    }
 }
 
 impl EnigoBackend {
@@ -20,7 +44,7 @@ impl EnigoBackend {
         let enigo =
             Enigo::new(&Settings::default()).map_err(|e| InputError::Init(format!("{e:?}")))?;
         Ok(Self {
-            inner: Mutex::new(enigo),
+            inner: Mutex::new(SendEnigo(enigo)),
         })
     }
 }

@@ -210,15 +210,37 @@ pub fn current_monitors(app: &AppHandle) -> Vec<Monitor> {
     list.into_iter()
         .enumerate()
         .map(|(i, m)| {
+            let scale = m.scale_factor();
             let pos = m.position();
             let size = m.size();
+            // enigo (playback) and rdev (recording) operate in the OS input-event
+            // coordinate space. On Windows (per-monitor DPI-aware) that space is
+            // physical pixels; on macOS it is logical *points* (the CGEvent global
+            // space). We store every engine coordinate in that space so clicks,
+            // multi-monitor clamping and the corner failsafe all agree with the
+            // input layer — so on macOS we convert Tauri's physical monitor bounds
+            // down to points. (See input/coords.rs; verified on a single Retina
+            // display — the multi-monitor point-origin mapping is untested.)
+            #[cfg(target_os = "macos")]
+            let (x, y, w, h) = {
+                let lp = pos.to_logical::<f64>(scale);
+                let ls = size.to_logical::<f64>(scale);
+                (
+                    lp.x.round() as i32,
+                    lp.y.round() as i32,
+                    ls.width.round() as i32,
+                    ls.height.round() as i32,
+                )
+            };
+            #[cfg(not(target_os = "macos"))]
+            let (x, y, w, h) = (pos.x, pos.y, size.width as i32, size.height as i32);
             Monitor {
                 id: i as u32,
-                x: pos.x,
-                y: pos.y,
-                w: size.width as i32,
-                h: size.height as i32,
-                scale: m.scale_factor(),
+                x,
+                y,
+                w,
+                h,
+                scale,
             }
         })
         .collect()

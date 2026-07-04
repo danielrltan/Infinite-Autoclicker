@@ -12,7 +12,8 @@ pub struct Rgb {
     pub b: u8,
 }
 
-/// A screen-coordinate rectangle (physical px).
+/// A screen-coordinate rectangle in the input-event space (logical points on
+/// macOS, physical px on Windows) — the same space as recorded click positions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rect {
     pub x: i32,
