@@ -1,4 +1,4 @@
-//! Coordinate / DPI / multi-monitor math (SPEC §7 — correctness-critical).
+//! Coordinate / DPI / multi-monitor math (SPEC §7 - correctness-critical).
 //!
 //! All stored coordinates are global virtual-desktop **physical** pixels, origin
 //! at the virtual desktop's top-left (which may be negative on multi-monitor

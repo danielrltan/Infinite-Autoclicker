@@ -16,7 +16,7 @@
   }
 }
 
-/* Design tokens — SPEC §10. Light is default; `.dark` on <html> flips them.
+/* Design tokens - SPEC §10. Light is default; `.dark` on <html> flips them.
    Fonts use system stacks (no network fetch, per the privacy guarantee). */
 :root {
   --bg: #ffffff;

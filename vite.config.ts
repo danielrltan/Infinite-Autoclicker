@@ -36,7 +36,7 @@ export default defineConfig({
     target: "es2021",
     minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
-    // No dynamic imports in this app — drop Vite's modulepreload `fetch()`
+    // No dynamic imports in this app - drop Vite's modulepreload `fetch()`
     // polyfill so the bundle contains zero network-call primitives (SPEC §F9).
     modulePreload: { polyfill: false },
   },

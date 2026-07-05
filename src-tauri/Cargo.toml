@@ -35,7 +35,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "std"
 xcap = "0.9.6"
 
 # macOS permission status uses framework-linked FFI (ApplicationServices / IOKit)
-# declared inline in input/macos.rs — no extra crates needed. Deep-links use `open`.
+# declared inline in input/macos.rs - no extra crates needed. Deep-links use `open`.
 
 [profile.release]
 panic = "abort"

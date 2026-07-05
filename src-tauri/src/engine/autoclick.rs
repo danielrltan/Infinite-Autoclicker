@@ -1,5 +1,5 @@
 //! Dedicated auto-clicker (OP Auto Clicker / Murgee parity). A tight click loop
-//! at a fixed interval — the direct "click here every N ms, forever or N times"
+//! at a fixed interval - the direct "click here every N ms, forever or N times"
 //! tool, distinct from the macro timeline. Shares the cancel / panic / corner
 //! failsafe model with the player (SPEC §F6).
 
@@ -290,7 +290,7 @@ mod tests {
         let token = CancelToken::new();
         token.cancel();
         let mut o = opts();
-        o.repeat = 0; // infinite — must still bail immediately
+        o.repeat = 0; // infinite - must still bail immediately
         ac.run_with(o, &mon(), token, &NoopSink);
         assert!(backend.ops.lock().unwrap().is_empty());
     }

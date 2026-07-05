@@ -66,7 +66,7 @@ impl HotkeyManager {
     ///
     /// Panic is deliberately *not* debounced: it's idempotent (stopping an
     /// already-stopped run is a no-op) and is the emergency kill switch, so it
-    /// must fire on every press — never suppressed by held state. Capture is
+    /// must fire on every press - never suppressed by held state. Capture is
     /// harmless to repeat as well.
     pub fn on_press(&self, code: &str) -> Option<HotkeyAction> {
         let action = self.match_action(code)?;
@@ -149,7 +149,7 @@ mod tests {
     #[test]
     fn panic_fires_on_every_press() {
         let m = HotkeyManager::new(HotkeyConfig::default()); // F12 = Panic
-        // Panic must never be suppressed by held state — repeats are harmless
+        // Panic must never be suppressed by held state - repeats are harmless
         // (idempotent) and it's the emergency stop.
         assert_eq!(m.on_press("F12"), Some(HotkeyAction::Panic));
         assert_eq!(m.on_press("F12"), Some(HotkeyAction::Panic));

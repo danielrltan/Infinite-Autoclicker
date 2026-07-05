@@ -1,6 +1,6 @@
 // Mirrors the Rust domain model in src-tauri/src/model/*. Keep in sync.
 // Serde uses internally-tagged enums (`tag = "kind"`/`"action"`) flattened onto
-// the parent, and lowercase variant names — see SPEC §6 and §9.
+// the parent, and lowercase variant names - see SPEC §6 and §9.
 
 export type MouseButton = "left" | "right" | "middle";
 export type KeyAction = "press" | "release";

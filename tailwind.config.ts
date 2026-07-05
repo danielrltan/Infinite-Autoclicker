@@ -22,9 +22,9 @@ export default {
           fg: "var(--accent-fg)",
         },
         // Semantic state colors (SPEC §10)
-        record: "var(--record)", // red — recording + destructive
-        play: "var(--play)", // green — playing + success
-        warn: "var(--warn)", // amber — permissions, mismatch
+        record: "var(--record)", // red - recording + destructive
+        play: "var(--play)", // green - playing + success
+        warn: "var(--warn)", // amber - permissions, mismatch
       },
       fontSize: {
         overline: ["11px", { lineHeight: "16px", letterSpacing: "0.04em" }],

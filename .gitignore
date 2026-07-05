@@ -1,5 +1,5 @@
 # ───────────────────────────────────────────────────────────────────
-# Internal / semi-private — never publish to GitHub
+# Internal / semi-private - never publish to GitHub
 # ───────────────────────────────────────────────────────────────────
 project_spec.md
 SPEC.md
@@ -36,7 +36,7 @@ target/
 /src-tauri/WixTools/
 
 # ───────────────────────────────────────────────────────────────────
-# Secrets / signing material — keep all signing keys local
+# Secrets / signing material - keep all signing keys local
 # ───────────────────────────────────────────────────────────────────
 .env
 .env.*

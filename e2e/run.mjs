@@ -1,6 +1,6 @@
 // End-to-end UI tests: drive the REAL app window via WebDriver (tauri-driver →
-// msedgedriver → WebView2). Covers the flows that kept breaking — recording
-// start/stop and the always-available Stop — so the app is tested, not the owner.
+// msedgedriver → WebView2). Covers the flows that kept breaking - recording
+// start/stop and the always-available Stop - so the app is tested, not the owner.
 //
 // Build the app first as a PRODUCTION bundle so the frontend is embedded (a plain
 // debug `cargo build` points the webview at the Vite dev server and shows a blank

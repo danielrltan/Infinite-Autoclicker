@@ -78,7 +78,7 @@ pub enum EventKind {
         ms: u64,
     },
     /// Find the largest blob of a target color on screen and click it. The click
-    /// position is resolved at *playback time* from the live screen — so it tracks
+    /// position is resolved at *playback time* from the live screen - so it tracks
     /// targets that move between runs. Skips if not found within `timeout_ms`.
     FindColor {
         #[serde(rename = "match")]

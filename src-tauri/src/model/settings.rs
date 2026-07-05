@@ -144,7 +144,7 @@ impl Default for HotkeyConfig {
 }
 
 impl HotkeyConfig {
-    /// All configured hotkey codes — used so the recorder never records a hotkey.
+    /// All configured hotkey codes - used so the recorder never records a hotkey.
     pub fn codes(&self) -> [&str; 5] {
         [
             &self.record_toggle,

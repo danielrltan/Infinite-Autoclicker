@@ -1,4 +1,4 @@
-//! Infinite Autoclicker — Tauri core library.
+//! Infinite Autoclicker - Tauri core library.
 //!
 //! Privacy guarantee (SPEC §F9): this crate makes **no** network calls. No HTTP
 //! client crate is a dependency; CI enforces the deny-list.

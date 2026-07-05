@@ -1,7 +1,7 @@
 # Infinite Autoclicker
 
 **A free, open-source auto clicker and macro recorder for Windows, macOS, and
-Linux** — a lightweight, privacy-first alternative to OP Auto Clicker, MurGee,
+Linux.** A lightweight, privacy-first alternative to OP Auto Clicker, MurGee,
 and GS Auto Clicker.
 
 Infinite Autoclicker clicks for you at any speed (from one slow click to hundreds
@@ -14,7 +14,7 @@ No ads. No accounts. No sign-up. No internet connection, ever.
 <div align="center">
   <br>
   <a href="https://github.com/danielrltan/Infinite-Autoclicker/releases/latest">
-    <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20%20INSTALL%20NOW-Download%20the%20latest%20version-e8442e?style=for-the-badge" alt="Download Infinite Autoclicker — free auto clicker and macro recorder for Windows, Mac, and Linux" height="44">
+    <img src="https://img.shields.io/badge/%E2%AC%87%EF%B8%8F%20%20INSTALL%20NOW-Download%20the%20latest%20version-e8442e?style=for-the-badge" alt="Download Infinite Autoclicker, a free auto clicker and macro recorder for Windows, Mac, and Linux" height="44">
   </a>
   <br><br>
 </div>
@@ -158,8 +158,8 @@ change them in Settings.
 
 ## How it compares to OP Auto Clicker, MurGee & other auto clickers
 
-Most popular auto clickers — OP Auto Clicker, GS Auto Clicker, MurGee Auto
-Clicker, Speed Auto Clicker, TinyTask — are Windows-only, closed-source
+Most popular auto clickers (OP Auto Clicker, GS Auto Clicker, MurGee Auto
+Clicker, Speed Auto Clicker, TinyTask) are Windows-only, closed-source
 freeware. Infinite Autoclicker runs on all three desktop platforms, is fully
 open source (MIT), and rolls an auto clicker, a macro recorder, color/pixel
 clicking, and a scheduler into one app that never touches the internet.
@@ -197,8 +197,8 @@ respective owners.</sub>
 ### Is this a free alternative to OP Auto Clicker?
 
 Yes. Infinite Autoclicker is free and open source. It does everything a basic
-auto clicker like OP Auto Clicker or GS Auto Clicker does — set a click
-interval, pick the click type, start and stop with a hotkey — and adds a macro
+auto clicker like OP Auto Clicker or GS Auto Clicker does (set a click
+interval, pick the click type, start and stop with a hotkey), and adds a macro
 recorder, color clicking, and a scheduler on top. Unlike most of them, it also
 runs on macOS and Linux, not just Windows.
 
@@ -213,7 +213,7 @@ blocks global input for every app of this kind.
 
 As many as your machine and the target app can keep up with. You set the delay
 between clicks, so you can go from one click every few seconds up to a very high
-CPS for speed-clicking — or turn on **Humanize** to make the timing look natural.
+CPS for speed-clicking, or turn on **Humanize** to make the timing look natural.
 
 ### Can I use it as a macro recorder like TinyTask?
 
@@ -224,13 +224,13 @@ as plain JSON files you can keep, edit, and share.
 ### Can I use it for games?
 
 It's a general-purpose desktop automation tool and works with any app on your
-screen. Many online games forbid automation in their rules, though — check the
+screen. Many online games forbid automation in their rules, though, so check the
 rules of anything you play and use it responsibly. It's aimed at repetitive
 desktop tasks, testing, and single-player or idle use.
 
 ### Is it safe, or is it a virus?
 
-It's open source and sends zero network traffic — the build fails if anyone adds
+It's open source and sends zero network traffic, and the build fails if anyone adds
 networking code. Antivirus tools sometimes flag *any* unsigned auto clicker
 because malware also automates input; if you got it from this repo's releases,
 that's a false positive. See [Is it safe?](#is-it-safe) above for the details.

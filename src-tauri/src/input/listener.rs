@@ -1,4 +1,4 @@
-//! Global input listening (rdev only — the one API that captures system-wide
+//! Global input listening (rdev only - the one API that captures system-wide
 //! input). Runs on its own OS thread for the app lifetime, updating the cursor
 //! tracker directly and forwarding normalized events to a single consumer
 //! (HotkeyManager + Recorder + corner-failsafe live there). See SPEC §4.

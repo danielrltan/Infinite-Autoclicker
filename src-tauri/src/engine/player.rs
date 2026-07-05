@@ -54,7 +54,7 @@ impl Player {
         self.playing.load(Ordering::SeqCst)
     }
 
-    /// Last position the player synthesized — lets the corner-failsafe ignore
+    /// Last position the player synthesized - lets the corner-failsafe ignore
     /// the player's own moves and only react to real user moves.
     pub fn last_synth(&self) -> (i32, i32) {
         (
@@ -347,7 +347,7 @@ fn execute_event(
             timeout_ms,
         } => {
             // Resolve the click position from the live screen. Scan until found,
-            // the timeout elapses, or we're cancelled — checking cancel every
+            // the timeout elapses, or we're cancelled - checking cancel every
             // capture so stop/panic/corner-slam still abort within ~one interval.
             let deadline = Instant::now() + Duration::from_millis(*timeout_ms as u64);
             loop {

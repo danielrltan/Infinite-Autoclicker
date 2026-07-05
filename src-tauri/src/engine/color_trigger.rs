@@ -1,5 +1,5 @@
 //! Color Trigger runner (owner request). Repeatedly captures the screen, finds
-//! the largest blob of a target color, and clicks its centroid — locked on
+//! the largest blob of a target color, and clicks its centroid - locked on
 //! rotating/shrinking/overlapping targets that defeat template matching.
 //! Shares the cancel/panic/corner-failsafe model with the player (SPEC §F6).
 
@@ -23,7 +23,7 @@ pub struct ColorTriggerOpts {
     /// Minimum delay between clicks (ms).
     pub interval_ms: u64,
     pub button: MouseButton,
-    /// If false, click wherever the cursor is (don't move) — rarely wanted.
+    /// If false, click wherever the cursor is (don't move) - rarely wanted.
     pub move_before_click: bool,
 }
 

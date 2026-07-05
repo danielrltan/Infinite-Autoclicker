@@ -1,5 +1,5 @@
 //! macOS permission status + deep-links to the right System Settings panes
-//! (SPEC §5). Uses framework-linked FFI (ApplicationServices / IOKit) — no extra
+//! (SPEC §5). Uses framework-linked FFI (ApplicationServices / IOKit) - no extra
 //! crates. On non-macOS platforms permissions are always "granted".
 
 use crate::model::PermissionStatus;

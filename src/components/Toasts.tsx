@@ -18,7 +18,7 @@ function ToastItem({ t, onDismiss }: { t: Toast; onDismiss: () => void }) {
   const [paused, setPaused] = React.useState(false);
   const [width, setWidth] = React.useState(100);
 
-  // Component owns the dismiss timer so we can pause it on hover/focus — the
+  // Component owns the dismiss timer so we can pause it on hover/focus - the
   // undo window must not expire while the user reaches for it.
   React.useEffect(() => {
     if (paused) return;

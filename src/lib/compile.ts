@@ -219,7 +219,7 @@ export function compileSteps(steps: Step[], opts: CompileOpts = {}): MacroEvent[
  * step reads as e.g. "4 clicks, 2 keys, motion" instead of an opaque event
  * count. Recorder output is down/up/move/key/scroll; a saved macro loaded into
  * a record step may also carry click/drag/findcolor. Returns "" for an empty or
- * motion-free-of-actions snippet — callers decide the fallback wording.
+ * motion-free-of-actions snippet - callers decide the fallback wording.
  */
 export function summarizeRecording(events: MacroEvent[]): string {
   let clicks = 0;
@@ -231,7 +231,7 @@ export function summarizeRecording(events: MacroEvent[]): string {
   for (const e of events) {
     switch (e.kind) {
       // A recorded press is one down (its up pairs with it); a built macro uses
-      // a single click event — both count as one click.
+      // a single click event - both count as one click.
       case "down":
       case "click":
         clicks += 1;
@@ -260,7 +260,7 @@ export function summarizeRecording(events: MacroEvent[]): string {
   if (keys) parts.push(plural(keys, "key"));
   if (scrolls) parts.push(plural(scrolls, "scroll"));
   if (colors) parts.push(plural(colors, "color click"));
-  // Sampled motion points aren't a meaningful count to the user — flag it, not tally it.
+  // Sampled motion points aren't a meaningful count to the user - flag it, not tally it.
   if (moves) parts.push("motion");
   return parts.join(", ");
 }

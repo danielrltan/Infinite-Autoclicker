@@ -15,7 +15,7 @@ pub fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-/// SplitMix64 — tiny, fast, good-enough PRNG for humanization jitter.
+/// SplitMix64 - tiny, fast, good-enough PRNG for humanization jitter.
 /// Not cryptographic; jitter quality does not require it (SPEC §F3a).
 pub struct Rng {
     state: u64,

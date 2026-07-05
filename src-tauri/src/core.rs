@@ -218,9 +218,9 @@ pub fn current_monitors(app: &AppHandle) -> Vec<Monitor> {
             // physical pixels; on macOS it is logical *points* (the CGEvent global
             // space). We store every engine coordinate in that space so clicks,
             // multi-monitor clamping and the corner failsafe all agree with the
-            // input layer — so on macOS we convert Tauri's physical monitor bounds
+            // input layer - so on macOS we convert Tauri's physical monitor bounds
             // down to points. (See input/coords.rs; verified on a single Retina
-            // display — the multi-monitor point-origin mapping is untested.)
+            // display - the multi-monitor point-origin mapping is untested.)
             #[cfg(target_os = "macos")]
             let (x, y, w, h) = {
                 let lp = pos.to_logical::<f64>(scale);
@@ -377,7 +377,7 @@ pub fn start_consumer(core: AppCore, app: AppHandle, rx: Receiver<RawInput>) {
             // This thread owns the stop hotkeys (F6/F12) + corner failsafe. It
             // must never die, or the user can get stuck under a running clicker.
             // Contain any per-event panic so the kill switch stays alive (in
-            // release, panic=abort kills the process instead — also safe).
+            // release, panic=abort kills the process instead - also safe).
             for raw in rx.iter() {
                 let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     process_event(&core, &app, &raw);
@@ -455,7 +455,7 @@ fn process_event(core: &AppCore, app: &AppHandle, raw: &RawInput) {
         }
     }
 
-    // 2) Hotkeys — edge-triggered. `on_press` suppresses OS auto-repeat for the
+    // 2) Hotkeys - edge-triggered. `on_press` suppresses OS auto-repeat for the
     //    toggle actions (so a held F5/F6 doesn't flip play/record on→off→on);
     //    `on_release` clears the held state for the next real press.
     match raw {
@@ -474,7 +474,7 @@ fn process_event(core: &AppCore, app: &AppHandle, raw: &RawInput) {
         _ => {}
     }
 
-    // 3) Corner failsafe — only on real user moves during playback.
+    // 3) Corner failsafe - only on real user moves during playback.
     if let RawInput::Move { x, y } = raw {
         maybe_corner_failsafe(core, app, *x, *y);
     }
@@ -535,7 +535,7 @@ fn handle_hotkey(core: &AppCore, app: &AppHandle, action: HotkeyAction) {
                 },
             );
         }
-        // Capture fills a Step field — needs the focused editor, so route to UI.
+        // Capture fills a Step field - needs the focused editor, so route to UI.
         HotkeyAction::Capture => {
             let _ = app.emit(
                 names::HOTKEY_TRIGGERED,

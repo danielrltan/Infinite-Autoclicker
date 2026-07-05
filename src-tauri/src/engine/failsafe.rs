@@ -1,4 +1,4 @@
-//! Cancellation + corner failsafe (SPEC §F6 — safety-critical).
+//! Cancellation + corner failsafe (SPEC §F6 - safety-critical).
 //!
 //! A tool that hijacks the mouse can lock the user out of their cursor. The
 //! player checks `CancelToken` between every event (and during every sleep

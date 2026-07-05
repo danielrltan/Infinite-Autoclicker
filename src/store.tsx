@@ -603,7 +603,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await ipc.stopColorTrigger().catch(() => {});
   }, []);
 
-  // Halt anything active — playback, color trigger, auto clicker, OR recording.
+  // Halt anything active - playback, color trigger, auto clicker, OR recording.
   // Both commands are no-ops when their thing isn't running, so this is always
   // safe and can be the single always-available Stop.
   const stopEverything = useCallback(async () => {
@@ -611,7 +611,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await ipc.stopRecording().catch(() => {});
   }, []);
 
-  // Record appends a "Recorded action" step and captures into it — recording is
+  // Record appends a "Recorded action" step and captures into it - recording is
   // just a fast way to author a chunk of the sequence. UI state follows backend
   // status:changed (see subscribe).
   const toggleRecord = useCallback(async () => {

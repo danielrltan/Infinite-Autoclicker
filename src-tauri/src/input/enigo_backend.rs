@@ -18,7 +18,7 @@ pub struct EnigoBackend {
 /// enigo's macOS `Enigo` holds a `CGEventSource` (a `NonNull`, so not `Send`),
 /// which makes `Mutex<Enigo>` not `Sync` and blocks `InputBackend: Send + Sync`.
 /// `EnigoBackend` only ever touches the inner `Enigo` while holding its `Mutex`,
-/// so access is serialized to one thread at a time — assert `Send` on a newtype
+/// so access is serialized to one thread at a time - assert `Send` on a newtype
 /// and deref to the wrapped `Enigo` so the method bodies stay unchanged.
 struct SendEnigo(Enigo);
 

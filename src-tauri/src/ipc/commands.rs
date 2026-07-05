@@ -1,4 +1,4 @@
-//! All `#[tauri::command]` functions — the typed IPC surface (SPEC §4).
+//! All `#[tauri::command]` functions - the typed IPC surface (SPEC §4).
 //! Mirrors src/lib/ipc.ts.
 
 use std::path::PathBuf;
@@ -170,7 +170,7 @@ pub fn save_macro(app: AppHandle, path: String, mac: Macro, overwrite: bool) -> 
 }
 
 /// Build the canonical path under the macros dir in Rust (the frontend passes a
-/// bare name, never a concatenated path — fixes the mixed-separator save bug).
+/// bare name, never a concatenated path - fixes the mixed-separator save bug).
 #[tauri::command]
 pub fn save_macro_by_name(
     app: AppHandle,

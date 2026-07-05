@@ -55,18 +55,18 @@ const distAssets = join(root, "dist", "assets");
 if (existsSync(distAssets)) {
   const jsFiles = readdirSync(distAssets).filter((f) => f.endsWith(".js"));
   if (jsFiles.length === 0) {
-    console.warn("note: no JS assets in dist/assets — run `bun run build` first for a full check.");
+    console.warn("note: no JS assets in dist/assets - run `bun run build` first for a full check.");
   }
   for (const f of jsFiles) {
     const content = readFileSync(join(distAssets, f), "utf8");
     for (const token of BANNED_TOKENS) {
       if (content.includes(token)) {
-        failures.push(`Bundle ${f} contains "${token}" — outbound network primitives are forbidden.`);
+        failures.push(`Bundle ${f} contains "${token}" - outbound network primitives are forbidden.`);
       }
     }
   }
 } else {
-  console.warn("note: dist/assets not found — bundle scan skipped (build first for full coverage).");
+  console.warn("note: dist/assets not found - bundle scan skipped (build first for full coverage).");
 }
 
 // ── Report ─────────────────────────────────────────────────────────

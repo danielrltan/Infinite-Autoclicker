@@ -12,7 +12,7 @@ import { Scheduler } from "@/components/Scheduler/Scheduler";
 
 /**
  * The single, always-visible transport. One Play (runs the sequence) and one
- * Stop that halts everything — sequence, auto-click, color, or a recording —
+ * Stop that halts everything - sequence, auto-click, color, or a recording -
  * via stopEverything → core.stop_all(). Run options + scheduling hang off it in
  * popovers so they're one click away without cluttering the workspace.
  */
@@ -31,7 +31,7 @@ export function RunBar() {
     schedules,
   } = useApp();
 
-  // Recording isn't a run, so the transport doesn't own it — the toolbar's
+  // Recording isn't a run, so the transport doesn't own it - the toolbar's
   // Record ⇄ Stop (and F5) is the single recording control. Play just parks
   // while recording so it can't fire mid-capture.
   const running = status === "playing";
