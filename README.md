@@ -9,8 +9,6 @@ of clicks per second), records your mouse and keyboard and replays them with the
 exact original timing, clicks targets by their color even when they move, and
 runs macros on a schedule.
 
-No ads. No accounts. No sign-up. No internet connection, ever.
-
 <div align="center">
   <br>
   <a href="https://github.com/danielrltan/Infinite-Autoclicker/releases/latest">
